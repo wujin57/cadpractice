@@ -6,11 +6,10 @@ set(CMAKE_CXX_STANDARD 14)
 include_directories(.)
 
 add_executable(ICCAD
-    main.cpp
-    parser.cpp
-    parsr.hpp
-    signal_table.cpp
-    signal_table.hpp
-    transaction.cpp
-    transaction.hpp
-        transaction.cpp)
+    src/main.cpp
+    src/parser.cpp
+    src/parser.hpp
+    src/signal_table.cpp
+    src/signal_table.hpp
+    src/transaction.hpp
+    src/transaction.cpp)
