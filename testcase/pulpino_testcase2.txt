@@ -1,0 +1,35 @@
+Number of Read Transactions with no wait states: 2711
+Number of Read Transactions with wait states: 0
+Number of Write Transactions with no wait states: 9
+Number of Write Transactions with wait states: 0
+Average Read Cycle: 2.00 cycles
+Average Write Cycle: 2.00 cycles
+Bus Utilization: 6.24%
+Number of Idle Cycles: 81753
+Number of Completer: 1
+CPU Elapsed Time: 0.87 ms
+
+Number of Transactions with Timeout: 0
+Number of Out-of-Range Accesses: 0
+Number of Mirrored Transactions: 0
+Number of Read-Write Overlap Errors: 0
+
+Completer 1 PADDR Connections
+a7: Correct
+a6: Correct
+a5: Correct
+a4: Correct
+a3: Correct
+a2: Correct
+a1: Correct
+a0: Correct
+
+Completer 1 PWDATA Connections
+d7: Correct
+d6: Correct
+d5: Correct
+d4: Correct
+d3: Correct
+d2: Correct
+d1: Correct
+d0: Correct
