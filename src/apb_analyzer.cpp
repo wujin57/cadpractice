@@ -53,59 +53,53 @@ void ApbAnalyzer::update_internal_signal_states(const SignalState& new_vcd_drive
     // current_signal_state_ = new_vcd_driven_state;
 }
 
+// ... (constructor and other functions from previous response) ...
+
 void ApbAnalyzer::on_pclk_rising_edge() {
     current_pclk_cycle_count_++;
-    stats_.record_pclk_cycle();
+    stats_.record_pclk_cycle();  // 假設 Statistics 物件已基本可用
 
-    // PRESETN is asynchronous, but its effect is often checked on PCLK edges
+    std::cout << "#" << current_vcd_time_ << " [PCLK Rise #" << current_pclk_cycle_count_ << "]"
+              << " PSEL=" << current_signal_state_.psel
+              << " PENABLE=" << current_signal_state_.penable
+              << " PADDR=0x" << std::hex << current_signal_state_.paddr << std::dec
+              << " PWRITE=" << current_signal_state_.pwrite
+              << " PREADY=" << current_signal_state_.pready
+              << std::endl;
+
+    // PRESETN (rst_n) 檢查
     if (!current_signal_state_.presetn) {  // Active low reset
-        if (in_transaction_) {
-            // Log protocol error: reset during transaction
-            error_logger_.log_error(current_vcd_time_,
-                                    format_protocol_error_msg("PRESETN asserted during transaction", latched_paddr_));
-            stats_.record_error_occurrence("ProtocolError");  // Generic or specific
+        if (in_transaction_) {             // 'in_transaction_' 是 ApbAnalyzer 的成員
+            // 暫時只印出訊息，之後會用 ErrorLogger
+            std::cout << "  ERROR: PRESETN asserted during transaction @ PADDR 0x" << std::hex << latched_paddr_ << std::dec << std::endl;
         }
-        reset_analyzer_state();          // Reset FSM and other states
-        fsm_state_ = ApbFsmState::IDLE;  // Explicitly IDLE after reset
-        // prev_signal_state_ should also be reset or reflect the reset state
-        prev_signal_state_ = current_signal_state_;
+        // reset_analyzer_state(); // 之後會完整實現
+        fsm_state_ = ApbFsmState::IDLE;
+        in_transaction_ = false;  // 確保交易狀態被重設
+        std::cout << "  System Reset Detected." << std::endl;
+        prev_signal_state_ = current_signal_state_;  // 在重設後，前一狀態也是重設狀態
         return;
     }
 
-    run_apb_fsm();
+    // --- 之後會在這裡呼叫 run_apb_fsm() ---
+    // run_apb_fsm(); // 目前先註解掉，專注於PCLK觸發
 
-    // After FSM and all checks for this cycle are done:
+    // 核心：在處理完當前PCLK週期的所有邏輯後，更新prev_signal_state_
     prev_signal_state_ = current_signal_state_;
 }
 
+// finalize_signal_definitions 和 finalize_analysis_and_fault_identification
+// 目前可以是空函式或只印出訊息，表示它們被呼叫了。
 void ApbAnalyzer::finalize_signal_definitions() {
-    // Get actual bus widths discovered by SignalManager
     paddr_actual_width_ = signal_manager_.get_paddr_width();
     pwdata_actual_width_ = signal_manager_.get_pwdata_width();
-    // std::cout << "APB Analyzer: PADDR width=" << paddr_actual_width_ << ", PWDATA width=" << pwdata_actual_width_ << std::endl;
+    std::cout << "ApbAnalyzer: Finalized signal definitions. PADDR width=" << paddr_actual_width_
+              << ", PWDATA width=" << pwdata_actual_width_ << std::endl;
 }
 
 void ApbAnalyzer::finalize_analysis_and_fault_identification() {
-    for (int c = 0; c < MAX_COMPLETERS; ++c) {
-        // Only identify faults for completers that were actually active
-        // This needs a way to track active completers, e.g. from stats_.get_num_completers() logic
-        // or by checking if any stats were recorded for paddr_bit_stats_[c]
-        bool completer_was_active = false;
-        for (int i = 0; i < paddr_actual_width_; ++i) {
-            for (int j = i + 1; j < paddr_actual_width_; ++j) {
-                if (paddr_bit_stats_[c][i][j].equal_count > 0 || paddr_bit_stats_[c][i][j].diff_count > 0) {
-                    completer_was_active = true;
-                    break;
-                }
-            }
-            if (completer_was_active)
-                break;
-        }
-
-        if (completer_was_active || stats_.get_num_completers() > c) {  // A bit heuristic, better to track active completers directly
-            identify_fixed_faulty_pairs_per_completer(c);
-        }
-    }
+    std::cout << "ApbAnalyzer: Finalizing analysis and fault identification (stub)." << std::endl;
+    // 之後會在這裡呼叫 identify_fixed_faulty_pairs_per_completer
 }
 
 // --- Completer ID Determination (CRUCIAL Placeholder) ---
