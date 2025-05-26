@@ -1,0 +1,37 @@
+APB Transaction Recognizer Report
+---------------------------------
+VCD File: <Input VCD Filename Here - main.cpp should pass this>
+Generated on: <Date and Time Here - main.cpp can generate this>
+---------------------------------
+
+I. Transaction Statistics:
+  Read Transactions (No Wait): 0
+  Read Transactions (With Wait): 0
+  Write Transactions (No Wait): 0
+  Write Transactions (With Wait): 0
+  Average Read Cycle: 0.00
+  Average Write Cycle: 0.00
+  Bus Utilization: 0.00%
+  Number of Idle Cycles: 0
+  Number of Completers: 0
+
+II. Error Summary:
+  Address Corruption: 0
+  Data Corruption: 0
+  Out-of-Range Access: 0
+  Read-Write Overlap: 0
+  Transaction Timeout: 0
+  PSLVERR Occurrences: 0
+  PADDR Instability: 0
+  PWDATA Instability: 0
+
+III. Completer PADDR/PWDATA Connections:
+  No active completers identified or no PADDR/PWDATA faults detected for default completers.
+
+IV. Detailed Error Log (Chronological):
+  No errors detected.
+
+V. Performance:
+  CPU Elapsed Time: 143.06 ms
+---------------------------------
+End of Report

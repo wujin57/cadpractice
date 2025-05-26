@@ -55,7 +55,7 @@ void ApbAnalyzer::update_internal_signal_states(const SignalState& new_vcd_drive
 
 // ... (constructor and other functions from previous response) ...
 
-void ApbAnalyzer::on_pclk_rising_edge() {
+void ApbAnalyzer::on_pclk_rising_edge(const SignalState& new_bus_state) {
     current_pclk_cycle_count_++;
     stats_.record_pclk_cycle();  // 假設 Statistics 物件已基本可用
 
@@ -104,43 +104,15 @@ void ApbAnalyzer::finalize_analysis_and_fault_identification() {
 
 // --- Completer ID Determination (CRUCIAL Placeholder) ---
 int ApbAnalyzer::determine_target_completer_id(uint32_t paddr) const {
-    // THIS IS A CRITICAL PLACEHOLDER.
-    // You MUST implement the logic to map PADDR to a completer ID (0 to MAX_COMPLETERS-1)
-    // based on your analysis of testcase4.vcd.txt and pulpino_testcase4.txt (output).
+    if (paddr >= UART_ADDR_START && paddr < UART_ADDR_END) {
+        return CompleterLogicalID::UART;
+    } else if (paddr >= GPIO_ADDR_START && paddr < GPIO_ADDR_END) {
+        return CompleterLogicalID::GPIO;
+    } else if (paddr >= SPI_MASTER_ADDR_START && paddr < SPI_MASTER_ADDR_END) {
+        return CompleterLogicalID::SPI_MASTER;
+    }
 
-    // Example based on HYPOTHETICAL PADDR bits:
-    // If PADDR[31:28] == 0x1 -> completer 0 (maps to "Completer 1" in output)
-    // If PADDR[31:28] == 0x2 -> completer 1 (maps to "Completer 2" in output)
-    // ... etc. for up to 5 completers
-
-    // For pulpino_testcase4.txt output:
-    // "Out-of-Range Access -> PADDR 0x00000000 (Requester 1 -> Completer 1)"
-    // "Out-of-Range Access -> PADDR 0xdeadbeef (Requester 1 -> Completer 2)"
-    // This implies 0x0 maps to (logical) Completer 1, and 0xdeadbeef to (logical) Completer 2.
-    // What are the ranges?
-    // If 0x00000000 is for "Completer 1" (your internal ID 0)
-    // If 0xDEADBEEF is for "Completer 2" (your internal ID 1)
-
-    // Let's assume a simple mapping for now based on some high bits,
-    // THIS NEEDS TO BE REPLACED WITH YOUR ACTUAL DERIVED LOGIC.
-    uint32_t region_selector = (paddr >> 28);  // Top 4 bits, for example
-
-    if (paddr == 0x00000000)
-        return 0;  // Maps to "Completer 1"
-    if (paddr == 0xdeadbeef)
-        return 1;  // Maps to "Completer 2"
-
-    // Add more sophisticated range checks or bit field checks here based on your analysis.
-    // e.g. if (region_selector == 0x0) return 0; // Completer 1
-    //      else if (region_selector == 0xD) return 1; // Completer 2 (for 0xDEADBEEF like addresses)
-
-    // Fallback if no specific mapping found for an active PSEL
-    // The contest might imply that valid PSEL cycles always have mappable PADDRs,
-    // or unmappable ones are Out-of-Range for a default/first completer.
-    if (paddr < 0x10000)
-        return 0;  // Default to completer 0 for "low" addresses if no other rule matches
-
-    return -1;  // Indicates PADDR does not map to a known completer
+    return CompleterLogicalID::UNKNOWN;  // 未知的地址範圍
 }
 
 // --- APB FSM Implementation ---
@@ -211,20 +183,9 @@ void ApbAnalyzer::start_new_transaction() {
 
     current_transaction_target_completer_id_ = determine_target_completer_id(latched_paddr_);
 
-    if (current_transaction_target_completer_id_ == -1 && current_signal_state_.psel) {
-        // PSEL is high, but PADDR doesn't map to any known completer. This is likely an out-of-range condition.
-        // The problem asks to report Out-of-Range with "(Requester 1 -> Completer Y)".
-        // This implies even for out-of-range, there's an *intended* (but unmapped or invalid) completer.
-        // How to get "Completer Y" if determine_target_completer_id returns -1?
-        // Let's assume determine_target_completer_id *can* return a completer ID even if the address is
-        // considered out-of-range for *that* completer's valid map, but the PADDR falls into its selector space.
-        // For now, if it's -1, we might default to completer 0 for error reporting context, or a special "unmapped" completer.
-        // Let's use a placeholder "intended_completer_for_error_report".
-        int intended_completer_for_error_report = 0;  // Placeholder if current_transaction_target_completer_id_ is -1
-        if (current_transaction_target_completer_id_ != -1)
-            intended_completer_for_error_report = current_transaction_target_completer_id_;
-
-        detect_out_of_range_access(intended_completer_for_error_report, latched_paddr_);  // Log it early if PSEL active but no mapping
+    if (current_transaction_target_completer_id_ == CompleterLogicalID::UNKNOWN && current_signal_state_.psel) {
+        // don't know the target completer, log an error
+        stats_.record_error_occurrence("OutOfRangeAccess");
     }
 
     // Check for Read-Write Overlap ONLY IF this is a READ transaction
@@ -325,15 +286,10 @@ void ApbAnalyzer::handle_access_state() {
     }
 
     if (current_signal_state_.pready) {  // Transaction completes
-        check_pslverr();                 // Check PSLVERR on the same cycle PREADY is high
         complete_current_transaction(false /*not an error termination by this path*/);
         fsm_state_ = ApbFsmState::IDLE;
     } else {  // PREADY is low, transaction is waiting
         check_timeout();
-        // If PSLVERR is asserted while PREADY is low, it's a bit ambiguous by APB spec.
-        // Typically PSLVERR is sampled when PREADY is high.
-        // If PSLVERR is asserted here, and PREADY is low, it might be an early error indication.
-        // Let's stick to checking PSLVERR when PREADY is high as per typical interpretation.
     }
 }
 
@@ -395,15 +351,6 @@ void ApbAnalyzer::check_paddr_pwdata_instability() {
     // Update latched_pwdata_for_instability_check_ for next cycle if still in ACCESS & PREADY is low
     if (latched_pwrite_ && !current_signal_state_.pready) {
         latched_pwdata_for_instability_check_ = current_signal_state_.pwdata;
-    }
-}
-
-void ApbAnalyzer::check_pslverr() {
-    if (current_signal_state_.pslverr) {
-        error_logger_.log_error(current_vcd_time_, format_pslverr_msg(latched_paddr_));
-        stats_.record_error_occurrence("PSLVERR");
-        // PSLVERR itself doesn't mean the transaction didn't "complete" in terms of protocol cycle,
-        // but it's an error response.
     }
 }
 
@@ -574,11 +521,7 @@ std::string ApbAnalyzer::format_timeout_msg(uint32_t paddr_val, int cycle_count)
         << " (Exceeded " << MAX_TIMEOUT_PCLK_CYCLES << " cycles)";  // Report threshold
     return oss.str();
 }
-std::string ApbAnalyzer::format_pslverr_msg(uint32_t paddr_val) const {
-    std::ostringstream oss;
-    oss << "PSLVERR Occurred -> Transaction at PADDR 0x" << std::hex << paddr_val << " reported error";
-    return oss.str();
-}
+
 std::string ApbAnalyzer::format_instability_msg(const std::string& signal_name, uint32_t paddr_val) const {
     std::ostringstream oss;
     oss << signal_name << " Instability -> " << signal_name << " changed during access phase for PADDR 0x" << std::hex << paddr_val;

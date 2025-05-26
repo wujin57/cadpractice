@@ -4,9 +4,10 @@
 #include <set>
 #include <string>
 #include <vector>
-
+namespace APBSystem {
 // --- 常數定義 ---
-constexpr int MAX_COMPLETERS = 5;
+constexpr int MAX_COMPLETERS = 3;
+constexpr int MAX_COMPLETERS_TO_TRACK = MAX_COMPLETERS;
 constexpr int MAX_SIGNAL_BITS = 32;   // 假設PADDR/PWDATA最多32位元
 constexpr int PADDR_REPORT_BITS = 8;  // 根據輸出範例，PADDR/PWDATA連接報告是a0-a7, d0-d7
 constexpr int PWDATA_REPORT_BITS = 8;
@@ -25,7 +26,6 @@ struct SignalState {
     bool psel = false;  // 單一PSEL訊號的狀態
     bool penable = false;
     bool pready = false;
-    bool pslverr = false;
     bool presetn = true;  // 通常初始為高（非重設狀態）
     bool pclk = false;
 };
@@ -58,3 +58,4 @@ struct TransactionData {
     int completer_id;
     // 可以加入其他需要的欄位，例如是否出錯
 };
+}

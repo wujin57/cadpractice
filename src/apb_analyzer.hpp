@@ -12,6 +12,17 @@
 #include <vector>
 
 namespace APBSystem {
+enum CompleterLogicalID { UART = 0,
+                          GPIO = 1,
+                          SPI_MASTER = 2,
+                          UNKNOWN = -1 };
+
+const uint32_t UART_ADDR_START = 0x1A100000;
+const uint32_t UART_ADDR_END = 0x1A100FFF;
+const uint32_t GPIO_ADDR_START = 0x1A101000;
+const uint32_t GPIO_ADDR_END = 0x1A101FFF;
+const uint32_t SPI_MASTER_ADDR_START = 0x1A102000;
+const uint32_t SPI_MASTER_ADDR_END = 0x1A102FFF;
 
 class ApbAnalyzer {
    public:
@@ -21,7 +32,7 @@ class ApbAnalyzer {
 
     void process_vcd_timestamp(int time);
     // Called on PCLK rising edge, triggers FSM and main logic
-    void on_pclk_rising_edge();
+    void on_pclk_rising_edge(const SignalState& new_bus_state);
     // Called after all VCD definitions are parsed (e.g., from $enddefinitions)
     void finalize_signal_definitions();
     // Called after all VCD value changes are processed (end of VCD parsing)

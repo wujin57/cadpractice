@@ -151,9 +151,6 @@ bool SignalManager::update_signal_state_from_vcd(const std::string& vcd_id_code,
         case VcdSignalPhysicalType::PREADY:
             target_state.pready = (new_uint_val != 0);
             break;
-        case VcdSignalPhysicalType::PSLVERR:
-            target_state.pslverr = (new_uint_val != 0);
-            break;
         case VcdSignalPhysicalType::OTHER:
             break;
         case VcdSignalPhysicalType::PARAMETER:
