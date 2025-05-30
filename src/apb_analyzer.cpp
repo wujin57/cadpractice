@@ -1,536 +1,148 @@
-// apb_analyzer.cpp
 #include "apb_analyzer.hpp"
-#include <iostream>  // For temporary debugging
-#include <sstream>   // For formatting messages
+#include <iostream>
+#include <sstream>
 
 namespace APBSystem {
-
 ApbAnalyzer::ApbAnalyzer(Statistics& stats_collector,
                          ErrorLogger& error_lgr,
                          const SignalManager& sig_mgr_ref)
-    : stats_(stats_collector), error_logger_(error_lgr), signal_manager_(sig_mgr_ref) {
-    reset_analyzer_state();
-    initialize_fault_discovery_structures_();
-    // Get actual bus widths after SignalManager has processed some signals
-    // This might be better done in finalize_signal_definitions()
-}
+    : stats_(stats_collector),
+      error_logger_(error_lgr),
+      signal_manager_(sig_mgr_ref),
+      current_vcd_time_(0),
+      current_pclk_cycle_count_since_reset_(0),
+      fsm_state_(ApbFsmState::IDLE),
+      in_transaction_(false),
+      current_transaction_start_vcd_time_(0),
+      current_transaction_start_pclk_cycle_(0),
+      current_transaction_paddr_val_(0),
+      current_transaction_is_read_(false),
+      current_transaction_pwdata_val_(0),
+      current_transaction_target_completer_(CompleterLogicalID::UNKNOWN),
+      access_phase_pclk_count_(0) {}
 
-void ApbAnalyzer::reset_analyzer_state() {
-    current_signal_state_ = {};  // Default initialize
-    prev_signal_state_ = {};
-    current_vcd_time_ = 0;
-    current_pclk_cycle_count_ = 0;
+void ApbAnalyzer::reset_analyzer_for_new_cycle_or_reset() {
     fsm_state_ = ApbFsmState::IDLE;
     in_transaction_ = false;
     access_phase_pclk_count_ = 0;
-    current_transaction_target_completer_id_ = -1;
-    active_write_transaction_.reset();
+    current_transaction_target_completer_ = CompleterLogicalID::UNKNOWN;
+    current_transaction_start_vcd_time_ = 0;
+    current_transaction_start_pclk_cycle_ = 0;
+    current_transaction_paddr_val_ = 0;
+    current_transaction_is_read_ = false;
+    current_transaction_pwdata_val_ = 0;
 }
 
-void ApbAnalyzer::initialize_fault_discovery_structures_() {
-    for (int c = 0; c < MAX_COMPLETERS; ++c) {
-        identified_paddr_faults_[c] = {};
-        identified_pwdata_faults_[c] = {};
-        for (int i = 0; i < MAX_SIGNAL_BITS; ++i) {
-            for (int j = 0; j < MAX_SIGNAL_BITS; ++j) {
-                paddr_bit_stats_[c][i][j] = {};
-                pwdata_bit_stats_[c][i][j] = {};
-            }
-        }
-    }
+CompleterLogicalID ApbAnalyzer::identify_target_completer(const SignalValues& signals) const {
+    if (signals.PSEL_UART)
+        return CompleterLogicalID::UART;
+    if (signals.PSEL_GPIO)
+        return CompleterLogicalID::GPIO;
+    if (signals.PSEL_SPI_MASTER)
+        return CompleterLogicalID::SPI_MASTER;
+    return CompleterLogicalID::UNKNOWN;
 }
 
-void ApbAnalyzer::process_vcd_timestamp(int time) {
-    current_vcd_time_ = time;
-}
+void ApbAnalyzer::process_pclk_event(long long current_vcd_time, const SignalValues& current_signals) {
+    current_vcd_time_ = current_vcd_time;
 
-void ApbAnalyzer::update_internal_signal_states(const SignalState& new_vcd_driven_state) {
-    // This function would be called by main after SignalManager updates a temporary SignalState
-    // For this design, on_pclk_rising_edge will directly use the state updated by SignalManager
-    // and then copy to prev_signal_state_.
-    // However, if main is orchestrating, it might look like:
-    // prev_signal_state_ = current_signal_state_; // Before current is updated
-    // current_signal_state_ = new_vcd_driven_state;
-}
+    if (!current_signals.PRESETn) {
+        reset_analyzer_for_new_cycle_or_reset();
+        current_pclk_cycle_count_since_reset_ = 0;
 
-// ... (constructor and other functions from previous response) ...
-
-void ApbAnalyzer::on_pclk_rising_edge(const SignalState& new_bus_state) {
-    current_pclk_cycle_count_++;
-    stats_.record_pclk_cycle();  // 假設 Statistics 物件已基本可用
-
-    std::cout << "#" << current_vcd_time_ << " [PCLK Rise #" << current_pclk_cycle_count_ << "]"
-              << " PSEL=" << current_signal_state_.psel
-              << " PENABLE=" << current_signal_state_.penable
-              << " PADDR=0x" << std::hex << current_signal_state_.paddr << std::dec
-              << " PWRITE=" << current_signal_state_.pwrite
-              << " PREADY=" << current_signal_state_.pready
-              << std::endl;
-
-    // PRESETN (rst_n) 檢查
-    if (!current_signal_state_.presetn) {  // Active low reset
-        if (in_transaction_) {             // 'in_transaction_' 是 ApbAnalyzer 的成員
-            // 暫時只印出訊息，之後會用 ErrorLogger
-            std::cout << "  ERROR: PRESETN asserted during transaction @ PADDR 0x" << std::hex << latched_paddr_ << std::dec << std::endl;
-        }
-        // reset_analyzer_state(); // 之後會完整實現
-        fsm_state_ = ApbFsmState::IDLE;
-        in_transaction_ = false;  // 確保交易狀態被重設
-        std::cout << "  System Reset Detected." << std::endl;
-        prev_signal_state_ = current_signal_state_;  // 在重設後，前一狀態也是重設狀態
         return;
     }
 
-    // --- 之後會在這裡呼叫 run_apb_fsm() ---
-    // run_apb_fsm(); // 目前先註解掉，專注於PCLK觸發
+    current_pclk_cycle_count_since_reset_++;
+    stats_.record_pclk_cycle();
 
-    // 核心：在處理完當前PCLK週期的所有邏輯後，更新prev_signal_state_
-    prev_signal_state_ = current_signal_state_;
-}
-
-// finalize_signal_definitions 和 finalize_analysis_and_fault_identification
-// 目前可以是空函式或只印出訊息，表示它們被呼叫了。
-void ApbAnalyzer::finalize_signal_definitions() {
-    paddr_actual_width_ = signal_manager_.get_paddr_width();
-    pwdata_actual_width_ = signal_manager_.get_pwdata_width();
-    std::cout << "ApbAnalyzer: Finalized signal definitions. PADDR width=" << paddr_actual_width_
-              << ", PWDATA width=" << pwdata_actual_width_ << std::endl;
-}
-
-void ApbAnalyzer::finalize_analysis_and_fault_identification() {
-    std::cout << "ApbAnalyzer: Finalizing analysis and fault identification (stub)." << std::endl;
-    // 之後會在這裡呼叫 identify_fixed_faulty_pairs_per_completer
-}
-
-// --- Completer ID Determination (CRUCIAL Placeholder) ---
-int ApbAnalyzer::determine_target_completer_id(uint32_t paddr) const {
-    if (paddr >= UART_ADDR_START && paddr < UART_ADDR_END) {
-        return CompleterLogicalID::UART;
-    } else if (paddr >= GPIO_ADDR_START && paddr < GPIO_ADDR_END) {
-        return CompleterLogicalID::GPIO;
-    } else if (paddr >= SPI_MASTER_ADDR_START && paddr < SPI_MASTER_ADDR_END) {
-        return CompleterLogicalID::SPI_MASTER;
+    bool is_bus_active_now = current_signals.is_any_psel_active();
+    if (is_bus_active_now) {
+        stats_.record_active_bus_cycle();
+    } else {
+        stats_.record_idle_cycle();
     }
 
-    return CompleterLogicalID::UNKNOWN;  // 未知的地址範圍
-}
-
-// --- APB FSM Implementation ---
-void ApbAnalyzer::run_apb_fsm() {
-    // This function is called on every PCLK rising edge (if not in reset)
-    // It will call the appropriate handler based on fsm_state_
-
-    // First, regardless of FSM state, if PSEL is high, update fault discovery stats
-    // Note: This should only be done if the PADDR is targeting a *known* completer.
-    // And it should happen *before* PADDR/PWDATA might change in the SETUP->ACCESS transition.
-    // Usually, PADDR is sampled in SETUP and held through ACCESS. PWDATA is driven in ACCESS for writes.
-    if (current_signal_state_.psel) {
-        int temp_target_completer = determine_target_completer_id(current_signal_state_.paddr);
-        if (temp_target_completer != -1) {
-            // Update fault stats when PSEL is high and PADDR is stable (typically throughout SETUP and ACCESS)
-            // However, the problem states "PADDR/PWDATA may become unstable during access phase".
-            // So, sample for permanent fault discovery ideally when these signals *should* be stable.
-            // Let's assume we sample on PCLK rise if PSEL is active.
-            update_paddr_fault_discovery_stats(temp_target_completer, current_signal_state_.paddr);
-            if (current_signal_state_.pwrite) {  // PWDATA is relevant for writes
-                update_pwdata_fault_discovery_stats(temp_target_completer, current_signal_state_.pwdata);
-            }
-        }
-    }
-
-    // FSM state transitions
     switch (fsm_state_) {
         case ApbFsmState::IDLE:
-            handle_idle_state();
+            handle_idle_state(current_signals);
             break;
         case ApbFsmState::SETUP:
-            handle_setup_state();
+            handle_setup_state(current_signals);
             break;
         case ApbFsmState::ACCESS:
-            handle_access_state();
+            handle_access_state(current_signals, current_vcd_time);
             break;
     }
-
-    if (!in_transaction_ && fsm_state_ == ApbFsmState::IDLE) {
-        stats_.record_idle_cycle();
-    } else if (in_transaction_ && (fsm_state_ == ApbFsmState::SETUP || fsm_state_ == ApbFsmState::ACCESS)) {
-        stats_.record_active_bus_cycle();
-    }
 }
 
-void ApbAnalyzer::handle_idle_state() {
-    if (current_signal_state_.psel && !current_signal_state_.penable) {
-        // Potential start of a new transaction
+void ApbAnalyzer::handle_idle_state(const SignalValues& current_signals) {
+    if (current_signals.is_any_psel_active() && !current_signals.PENABLE) {
         fsm_state_ = ApbFsmState::SETUP;
-        start_new_transaction();
-    } else if (current_signal_state_.psel && current_signal_state_.penable) {
-        // Protocol error: PENABLE should not be high in IDLE if PSEL is also high (unless it's a direct jump to ACCESS, which is unusual for APB start)
-        // Or, this could be a continuation of a previous cycle's issue.
-        // Let's assume PSEL=1, PENABLE=0 is the only valid way to enter SETUP from IDLE.
-        // If PSEL=1, PENABLE=1 from IDLE, it's likely an issue or a state not clearly defined for start.
-        // For now, we require PSEL=1, PENABLE=0 to move to SETUP.
-    }
-}
 
-void ApbAnalyzer::start_new_transaction() {
-    in_transaction_ = true;
-    transaction_start_pclk_cycle_ = current_pclk_cycle_count_;
-    latched_paddr_ = current_signal_state_.paddr;
-    latched_pwrite_ = current_signal_state_.pwrite;
-    access_phase_pclk_count_ = 0;
-    paddr_stable_in_access_ = true;  // Assume stable until proven otherwise
-    pwdata_stable_in_access_ = true;
-
-    current_transaction_target_completer_id_ = determine_target_completer_id(latched_paddr_);
-
-    if (current_transaction_target_completer_id_ == CompleterLogicalID::UNKNOWN && current_signal_state_.psel) {
-        // don't know the target completer, log an error
-        stats_.record_error_occurrence("OutOfRangeAccess");
-    }
-
-    // Check for Read-Write Overlap ONLY IF this is a READ transaction
-    if (!latched_pwrite_) {  // Current transaction is a READ
-        detect_read_write_overlap(latched_paddr_, current_transaction_target_completer_id_);
-    }
-
-    // If this new transaction is a WRITE, it becomes the "active_write_transaction_"
-    if (latched_pwrite_) {
-        active_write_transaction_ = ActiveWriteInfo{latched_paddr_, current_transaction_target_completer_id_};
-    }
-
-    // PADDR/PWDATA corruption check: sample expected values at SETUP.
-    // The "received" is what's on the bus. "Expected" is inferred if a known fault exists.
-    if (current_transaction_target_completer_id_ != -1) {
-        const auto& paddr_fault = identified_paddr_faults_[current_transaction_target_completer_id_];
-        if (paddr_fault.isActive) {
-            // If PADDR[fault.bit1] == PADDR[fault.bit2] and both are 1 (due to floating high)
-            // And if one of them *should* have been 0.
-            bool bit1_val = (current_signal_state_.paddr >> paddr_fault.bit1) & 1;
-            bool bit2_val = (current_signal_state_.paddr >> paddr_fault.bit2) & 1;
-            if (bit1_val && bit2_val) {  // Received (1,1) at fault location
-                // Infer expected: flip one bit to 0
-                uint32_t inferred_expected_paddr1 = current_signal_state_.paddr ^ (1U << paddr_fault.bit1);
-                // We need to be sure this was the *intended* write that got corrupted.
-                // This check is tricky: we see the *corrupted* value on the bus.
-                // The problem implies we report "Expected" (original) vs "Received" (corrupted).
-                // This means if a fault is known (e.g. a5-a4 float high), and we see a value
-                // where a5=1, a4=1, we infer that the "expected" might have been a5=1,a4=0 or a5=0,a4=1.
-                // The example output "Expected PADDR: 0x08, Received: 0x0C (a5-a4 Floating)"
-                // 0x08 -> ...00001000. 0x0C -> ...00001100. If a5-a4 are 0-indexed, this is (a3,a2).
-                // If a5, a4 (1-indexed from example image for 0x8A -> 0x8E) means bit 5 and bit 4.
-                // For 0x08 (00001000) vs 0x0C (00001100), bits 2 and 3. If bits 2 & 3 float high:
-                // Original PADDR[3]=1, PADDR[2]=0. Received PADDR[3]=1, PADDR[2]=1.
-                // Log "Expected 0x08, Received 0x0C (a3-a2 Floating)"
-                detect_and_log_address_corruption(current_transaction_target_completer_id_, inferred_expected_paddr1, current_signal_state_.paddr);
-            }
+        current_transaction_start_vcd_time_ = current_vcd_time_;
+        current_transaction_start_pclk_cycle_ = current_pclk_cycle_count_since_reset_;
+        current_transaction_paddr_val_ = current_signals.PADDR;
+        current_transaction_is_read_ = !current_signals.PWRITE;
+        if (!current_transaction_is_read_) {
+            current_transaction_pwdata_val_ = current_signals.PWDATA;
+        } else {
+            current_transaction_pwdata_val_ = 0;
         }
-        // Similar logic for PWDATA, but PWDATA is driven in ACCESS phase for writes.
-        // So, PWDATA corruption check should be there.
+        current_transaction_target_completer_ = identify_target_completer(current_signals);
+        access_phase_pclk_count_ = 0;
+
+        check_setup_phase_errors(current_signals);
     }
 }
 
-void ApbAnalyzer::handle_setup_state() {
-    // PADDR should be stable. PWDATA is not driven by master yet.
-    // PSEL should remain high. PENABLE should go high to enter ACCESS.
-    if (!current_signal_state_.psel) {
-        // Protocol Error: PSEL dropped during SETUP
-        error_logger_.log_error(current_vcd_time_, format_protocol_error_msg("PSEL dropped during SETUP", latched_paddr_));
-        stats_.record_error_occurrence("ProtocolError_PselDropSetup");
-        complete_current_transaction(true /*is_error*/);
-        fsm_state_ = ApbFsmState::IDLE;
-        return;
-    }
-
-    if (current_signal_state_.penable) {
+void ApbAnalyzer::handle_setup_state(const SignalValues& current_signals) {
+    check_setup_phase_errors(current_signals);
+    if (current_signals.PENABLE) {
         fsm_state_ = ApbFsmState::ACCESS;
-        access_phase_pclk_count_ = 1;  // First cycle in access phase
-        // Latch PWDATA now if it's a write, for instability check from next cycle
-        if (latched_pwrite_) {
-            latched_pwdata_for_instability_check_ = current_signal_state_.pwdata;
-
-            // PWDATA corruption check at the start of ACCESS phase for writes
-            if (current_transaction_target_completer_id_ != -1) {
-                const auto& pwdata_fault = identified_pwdata_faults_[current_transaction_target_completer_id_];
-                if (pwdata_fault.isActive) {
-                    bool bit1_val = (current_signal_state_.pwdata >> pwdata_fault.bit1) & 1;
-                    bool bit2_val = (current_signal_state_.pwdata >> pwdata_fault.bit2) & 1;
-                    if (bit1_val && bit2_val) {  // Received (1,1) at fault location
-                        uint32_t inferred_expected_pwdata1 = current_signal_state_.pwdata ^ (1U << pwdata_fault.bit1);
-                        detect_and_log_data_corruption(current_transaction_target_completer_id_, inferred_expected_pwdata1, current_signal_state_.pwdata);
-                    }
-                }
-            }
-        }
+        access_phase_pclk_count_ = 1;
     }
-    // If PENABLE does not go high, we stay in SETUP (wait state for master to assert PENABLE)
-    // This is not standard APB; APB has no wait states in SETUP for master. Slave introduces wait via PREADY in ACCESS.
-    // If PENABLE stays low while PSEL is high, we are still in SETUP.
 }
 
-void ApbAnalyzer::handle_access_state() {
-    access_phase_pclk_count_++;
-
-    // Check for PADDR/PWDATA instability
-    check_paddr_pwdata_instability();
-
-    if (!current_signal_state_.psel || !current_signal_state_.penable) {
-        // Protocol Error: PSEL or PENABLE dropped during ACCESS before PREADY
-        error_logger_.log_error(current_vcd_time_,
-                                format_protocol_error_msg(
-                                    !current_signal_state_.psel ? "PSEL dropped during ACCESS" : "PENABLE dropped during ACCESS",
-                                    latched_paddr_));
-        stats_.record_error_occurrence(!current_signal_state_.psel ? "ProtocolError_PselDropAccess" : "ProtocolError_PenableDropAccess");
-        complete_current_transaction(true /*is_error*/);
+void ApbAnalyzer::handle_access_state(const SignalValues& current_signals, long long current_vcd_time) {
+    if (!current_signals.is_any_psel_active() || !current_signals.PENABLE) {
         fsm_state_ = ApbFsmState::IDLE;
         return;
     }
 
-    if (current_signal_state_.pready) {  // Transaction completes
-        complete_current_transaction(false /*not an error termination by this path*/);
-        fsm_state_ = ApbFsmState::IDLE;
-    } else {  // PREADY is low, transaction is waiting
-        check_timeout();
-    }
-}
+    check_access_phase_errors(current_signals);
+    if (current_signals.PREADY) {
+        APBSystem::TransactionData tx_data;
 
-void ApbAnalyzer::complete_current_transaction(bool is_error_termination) {
-    if (!in_transaction_)
-        return;  // Should not happen
+        tx_data.start_time_ = current_transaction_start_vcd_time_;
+        tx_data.end_time_ = current_vcd_time;
+        tx_data.paddr_ = current_transaction_paddr_val_;
+        tx_data.is_write_ = current_transaction_is_read_;
 
-    int duration_cycles = current_pclk_cycle_count_ - transaction_start_pclk_cycle_ + 1;
-    // An APB transaction is at least 2 PCLK cycles (1 setup, 1 access if no wait and PREADY high on first access cycle)
-    bool has_wait = (duration_cycles > 2);
+        if (tx_data.is_write_) {
+            tx_data.pwdata_ = current_transaction_pwdata_val_;
+        }
 
-    TransactionData tx_data;
-    tx_data.start_time_vcd = current_vcd_time_;  // Or time of PREADY assertion
-    tx_data.duration_pclk_cycles = duration_cycles;
-    tx_data.paddr = latched_paddr_;
-    tx_data.is_write = latched_pwrite_;
-    tx_data.has_wait_states = has_wait;
-    tx_data.completer_id = current_transaction_target_completer_id_;
+        tx_data.completer_id_ = current_transaction_target_completer_;
+        tx_data.duration_pclk_cycles_ = 1 + access_phase_pclk_count_;
+        tx_data.has_wait_states_ = (access_phase_pclk_count_ > 1);
 
-    if (!is_error_termination) {  // Only record stats for normally completed (even if PSLVERR) transactions
         stats_.record_transaction_completion(tx_data);
-    }
-
-    // If it was an active write, clear it
-    if (latched_pwrite_ && active_write_transaction_ && active_write_transaction_->paddr == latched_paddr_) {
-        active_write_transaction_.reset();
-    }
-
-    in_transaction_ = false;
-    current_transaction_target_completer_id_ = -1;
-}
-
-// --- Error Detection and Logging Stubs (to be filled with logic from your transaction.cpp) ---
-void ApbAnalyzer::check_paddr_pwdata_instability() {
-    if (!in_transaction_ || fsm_state_ != ApbFsmState::ACCESS)
-        return;
-
-    if (current_signal_state_.paddr != latched_paddr_) {
-        if (paddr_stable_in_access_) {  // Log only once per transaction
-            error_logger_.log_error(current_vcd_time_, format_instability_msg("PADDR", latched_paddr_));
-            stats_.record_error_occurrence("PADDRInstability");
-            paddr_stable_in_access_ = false;
-        }
-    }
-    if (latched_pwrite_ && current_signal_state_.pwdata != latched_pwdata_for_instability_check_) {
-        // Need to update latched_pwdata_for_instability_check_ each cycle PREADY is low if we expect PWDATA to be stable
-        // Or, PWDATA is only guaranteed stable in the cycle PREADY is high?
-        // The problem says "PWDATA... may become unstable during the access phase".
-        // This implies we should check it against its value at the start of access or previous cycle.
-        // For simplicity, let's compare with value at start of access (SETUP->ACCESS transition)
-        // If PWDATA is allowed to change during wait states, then this check is more complex.
-        // Assume for now, PWDATA for a write should be stable throughout ACCESS until PREADY.
-        if (pwdata_stable_in_access_) {
-            error_logger_.log_error(current_vcd_time_, format_instability_msg("PWDATA", latched_paddr_));
-            stats_.record_error_occurrence("PWDATAInstability");
-            pwdata_stable_in_access_ = false;
-        }
-    }
-    // Update latched_pwdata_for_instability_check_ for next cycle if still in ACCESS & PREADY is low
-    if (latched_pwrite_ && !current_signal_state_.pready) {
-        latched_pwdata_for_instability_check_ = current_signal_state_.pwdata;
-    }
-}
-
-void ApbAnalyzer::check_timeout() {
-    if (access_phase_pclk_count_ > MAX_TIMEOUT_PCLK_CYCLES) {
-        error_logger_.log_error(current_vcd_time_, format_timeout_msg(latched_paddr_, access_phase_pclk_count_));
-        stats_.record_error_occurrence("Timeout");
-        complete_current_transaction(true /*error termination*/);
-        fsm_state_ = ApbFsmState::IDLE;  // Force idle on timeout
-    }
-}
-
-void ApbAnalyzer::detect_and_log_address_corruption(int completer_id, uint32_t expected_paddr, uint32_t received_paddr) {
-    if (completer_id == -1)
-        return;
-    const auto& fault = identified_paddr_faults_[completer_id];
-    if (fault.isActive) {
-        // We log if received_paddr matches the fault pattern (e.g. bit1 and bit2 are 1)
-        // and expected_paddr is what we inferred it should have been.
-        // The check that fault.bit1 and fault.bit2 are indeed 1 in received_paddr was done
-        // when calling this function (implicitly by the caller).
-        error_logger_.log_error(current_vcd_time_, format_addr_corr_msg(expected_paddr, received_paddr, fault.bit2, fault.bit1));  // Report larger bit first
-        stats_.record_error_occurrence("AddressCorruption");
-    }
-}
-void ApbAnalyzer::detect_and_log_data_corruption(int completer_id, uint32_t expected_pwdata, uint32_t received_pwdata) {
-    if (completer_id == -1)
-        return;
-    const auto& fault = identified_pwdata_faults_[completer_id];
-    if (fault.isActive) {
-        error_logger_.log_error(current_vcd_time_, format_data_corr_msg(expected_pwdata, received_pwdata, fault.bit2, fault.bit1));
-        stats_.record_error_occurrence("DataCorruption");
-    }
-}
-
-void ApbAnalyzer::detect_out_of_range_access(int target_completer_id, uint32_t paddr_val) {
-    // This is called if PSEL is active but determine_target_completer_id decided it's out of range
-    // OR if PSLVERR is asserted for an address that *is* in range but completer flags it.
-    // The contest output for Out-of-Range specifies "Completer <Y>".
-    // So, target_completer_id should be the *intended* completer for that address range.
-    error_logger_.log_error(current_vcd_time_, format_out_of_range_msg(paddr_val, target_completer_id + 1));  // Assuming completer_id is 0-indexed, output is 1-indexed
-    stats_.record_error_occurrence("OutOfRangeAccess");
-}
-
-void ApbAnalyzer::detect_read_write_overlap(uint32_t read_paddr, int read_completer_id) {
-    if (active_write_transaction_ &&
-        active_write_transaction_->paddr == read_paddr &&
-        active_write_transaction_->completer_id == read_completer_id) {
-        error_logger_.log_error(current_vcd_time_, format_rw_overlap_msg(read_paddr));
-        stats_.record_error_occurrence("ReadWriteOverlap");
-    }
-}
-
-// --- Fault Discovery (Adapted from your transaction.cpp) ---
-void ApbAnalyzer::update_paddr_fault_discovery_stats(int completer_id, uint32_t paddr_val) {
-    if (completer_id < 0 || completer_id >= MAX_COMPLETERS)
-        return;
-
-    for (int i = 0; i < paddr_actual_width_; ++i) {
-        for (int j = i + 1; j < paddr_actual_width_; ++j) {
-            bool bit_i_val = (paddr_val >> i) & 1;
-            bool bit_j_val = (paddr_val >> j) & 1;
-            if (bit_i_val == bit_j_val) {
-                paddr_bit_stats_[completer_id][i][j].equal_count++;
-            } else {
-                paddr_bit_stats_[completer_id][i][j].diff_count++;
-            }
+        fsm_state_ = ApbFsmState::IDLE;
+    } else {  // PREADY is not high yet
+        access_phase_pclk_count_++;
+        if (access_phase_pclk_count_ > MAX_TIMEOUT_PCLK_CYCLES) {
+            // error_logger
         }
     }
 }
 
-void ApbAnalyzer::update_pwdata_fault_discovery_stats(int completer_id, uint32_t pwdata_val) {
-    if (completer_id < 0 || completer_id >= MAX_COMPLETERS)
-        return;
-
-    for (int i = 0; i < pwdata_actual_width_; ++i) {
-        for (int j = i + 1; j < pwdata_actual_width_; ++j) {
-            bool bit_i_val = (pwdata_val >> i) & 1;
-            bool bit_j_val = (pwdata_val >> j) & 1;
-            if (bit_i_val == bit_j_val) {
-                pwdata_bit_stats_[completer_id][i][j].equal_count++;
-            } else {
-                pwdata_bit_stats_[completer_id][i][j].diff_count++;
-            }
-        }
-    }
+void ApbAnalyzer::check_setup_phase_errors(const SignalValues& current_signals) {
 }
 
-void ApbAnalyzer::identify_fixed_faulty_pairs_per_completer(int completer_id) {
-    if (completer_id < 0 || completer_id >= MAX_COMPLETERS)
-        return;
-
-    // PADDR
-    for (int i = 0; i < paddr_actual_width_; ++i) {
-        for (int j = i + 1; j < paddr_actual_width_; ++j) {
-            if (paddr_bit_stats_[completer_id][i][j].diff_count == 0 &&
-                paddr_bit_stats_[completer_id][i][j].equal_count >= MIN_OBSERVATIONS_FOR_FAULT) {
-                if (!identified_paddr_faults_[completer_id].isActive) {  // Store first identified pair
-                    identified_paddr_faults_[completer_id].isActive = true;
-                    identified_paddr_faults_[completer_id].bit1 = i;
-                    identified_paddr_faults_[completer_id].bit2 = j;
-                    // std::cout << "DEBUG: PADDR fault identified for completer " << completer_id << ": a" << j << "-a" << i << std::endl;
-                } else {
-                    // Optional: Warn if multiple pairs meet criteria, problem implies only one 2-bit fault.
-                }
-            }
-        }
-    }
-    // PWDATA
-    for (int i = 0; i < pwdata_actual_width_; ++i) {
-        for (int j = i + 1; j < pwdata_actual_width_; ++j) {
-            if (pwdata_bit_stats_[completer_id][i][j].diff_count == 0 &&
-                pwdata_bit_stats_[completer_id][i][j].equal_count >= MIN_OBSERVATIONS_FOR_FAULT) {
-                if (!identified_pwdata_faults_[completer_id].isActive) {
-                    identified_pwdata_faults_[completer_id].isActive = true;
-                    identified_pwdata_faults_[completer_id].bit1 = i;
-                    identified_pwdata_faults_[completer_id].bit2 = j;
-                    // std::cout << "DEBUG: PWDATA fault identified for completer " << completer_id << ": d" << j << "-d" << i << std::endl;
-                }
-            }
-        }
-    }
+void ApbAnalyzer::check_access_phase_errors(const SignalValues& current_signals) {
 }
 
-const IdentifiedFloatingPair& ApbAnalyzer::get_paddr_fault_info(int completer_id) const {
-    if (completer_id >= 0 && completer_id < MAX_COMPLETERS) {
-        return identified_paddr_faults_[completer_id];
-    }
-    static IdentifiedFloatingPair empty_fault;
-    return empty_fault;  // Should not happen if completer_id is valid
+void ApbAnalyzer::finalize_analysis_at_vcd_end() {
 }
-const IdentifiedFloatingPair& ApbAnalyzer::get_pwdata_fault_info(int completer_id) const {
-    if (completer_id >= 0 && completer_id < MAX_COMPLETERS) {
-        return identified_pwdata_faults_[completer_id];
-    }
-    static IdentifiedFloatingPair empty_fault;
-    return empty_fault;
-}
-
-// --- Formatting error messages (Example stubs) ---
-std::string ApbAnalyzer::format_addr_corr_msg(uint32_t expected, uint32_t received, int bit_fault_larger, int bit_fault_smaller) const {
-    std::ostringstream oss;
-    oss << "Address Corruption -> Expected PADDR: 0x" << std::hex << expected
-        << ", Received: 0x" << std::hex << received << " (a" << bit_fault_larger << "-a" << bit_fault_smaller << " Floating)";
-    return oss.str();
-}
-std::string ApbAnalyzer::format_data_corr_msg(uint32_t expected, uint32_t received, int bit_fault_larger, int bit_fault_smaller) const {
-    std::ostringstream oss;
-    oss << "Data Corruption -> Expected PWDATA: 0x" << std::hex << expected
-        << ", Received: 0x" << std::hex << received << " (d" << bit_fault_larger << "-d" << bit_fault_smaller << " Floating)";
-    return oss.str();
-}
-std::string ApbAnalyzer::format_out_of_range_msg(uint32_t paddr_val, int completer_display_id) const {
-    std::ostringstream oss;
-    oss << "Out-of-Range Access -> PADDR 0x" << std::hex << paddr_val
-        << " (Requester 1 -> Completer " << completer_display_id << ")";
-    return oss.str();
-}
-std::string ApbAnalyzer::format_rw_overlap_msg(uint32_t paddr_val) const {
-    std::ostringstream oss;
-    oss << "Read-Write Overlap Error -> Read & Write at PADDR 0x" << std::hex << paddr_val << " overlapped";
-    return oss.str();
-}
-std::string ApbAnalyzer::format_timeout_msg(uint32_t paddr_val, int cycle_count) const {
-    std::ostringstream oss;
-    // The contest output shows (Exceeded <N> cycles), where N is the threshold.
-    oss << "Timeout Occurred -> Transaction Stalled at PADDR 0x" << std::hex << paddr_val
-        << " (Exceeded " << MAX_TIMEOUT_PCLK_CYCLES << " cycles)";  // Report threshold
-    return oss.str();
-}
-
-std::string ApbAnalyzer::format_instability_msg(const std::string& signal_name, uint32_t paddr_val) const {
-    std::ostringstream oss;
-    oss << signal_name << " Instability -> " << signal_name << " changed during access phase for PADDR 0x" << std::hex << paddr_val;
-    return oss.str();
-}
-std::string ApbAnalyzer::format_protocol_error_msg(const std::string& reason, uint32_t paddr_val) const {
-    std::ostringstream oss;
-    oss << "Protocol Error -> " << reason << " for PADDR 0x" << std::hex << paddr_val;
-    return oss.str();
-}
-
 }  // namespace APBSystem

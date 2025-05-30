@@ -1,0 +1,106 @@
+$date
+    May 27, 2025 09:30:00
+$end
+$version
+    Custom Small VCD for APB_Recognizer Test
+$end
+$timescale
+    1 ps
+$end
+
+$scope module test $end
+$scope module apb_if $end
+$var wire 1 # clk $end          // PCLK
+$var wire 1 $ rst_n $end       // PRESETN (Active Low)
+$var reg 32 % paddr [31:0] $end // PADDR
+$var reg 1 ' pwrite $end      // PWRITE
+$var reg 1 ( psel $end        // PSEL
+$var reg 1 ) penable $end     // PENABLE
+$var reg 1 * pready $end      // PREADY
+$var reg 32 + prdata [31:0] $end // PRDATA
+$var reg 32 & pwdata [31:0] $end // PWDATA
+// Note: PSLVERR is not included as per Q&A A8
+// Note: Parameter definitions ADDR_WIDTH, DATA_WIDTH are omitted for simplicity in this small test
+$upscope $end
+$upscope $end
+
+$enddefinitions $end
+
+$dumpvars
+0#  // clk = 0
+1$  // rst_n = 1 (not in reset)
+b0 % // paddr = 0
+0'  // pwrite = 0 (read)
+0(  // psel = 0
+0)  // penable = 0
+0* // pready = 0
+b0 + // prdata = 0
+b0 & // pwdata = 0
+$end
+
+#0
+// Initial values are set by $dumpvars
+
+#5000
+1#  // clk rises (0 -> 1)
+
+#10000
+0#  // clk falls (1 -> 0)
+1(  // psel = 1 (Start of SETUP phase for a potential transaction)
+b10101010 % // paddr = 0xAA (example)
+
+#15000
+1#  // clk rises (0 -> 1)
+    // Analyzer should process PSEL=1, PADDR=0xAA
+    // PENABLE is still 0, so should be in SETUP state
+
+#20000
+0#  // clk falls (1 -> 0)
+1)  // penable = 1 (Move to ACCESS phase)
+
+#25000
+1#  // clk rises (0 -> 1)
+    // Analyzer should process PSEL=1, PENABLE=1, PADDR=0xAA
+    // Should be in ACCESS state
+
+#30000
+0#  // clk falls (1 -> 0)
+1* // pready = 1 (Transaction ends)
+
+#35000
+1#  // clk rises (0 -> 1)
+    // Analyzer should process PSEL=1, PENABLE=1, PADDR=0xAA, PREADY=1
+    // Transaction should complete, FSM goes to IDLE
+
+#40000
+0#  // clk falls (1 -> 0)
+0(  // psel = 0
+0)  // penable = 0
+0* // pready = 0 (back to idle values)
+b0 %
+
+#45000
+1# // clk rises
+
+#50000
+0# // clk falls
+
+// Test reset condition
+#55000
+1# // clk rises
+0$ // rst_n = 0 (Reset asserted)
+
+#60000
+0# // clk falls
+
+#65000
+1# // clk rises (still in reset)
+    // Analyzer should detect reset
+
+#70000
+0# // clk falls
+1$ // rst_n = 1 (Reset de-asserted)
+
+#75000
+1# // clk rises (out of reset)
+    // Analyzer should be in IDLE state
