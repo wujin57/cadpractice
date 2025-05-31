@@ -1,106 +1,80 @@
 #pragma once
-#include <chrono>
-#include <iomanip>
-#include <map>
-#include <set>
-#include <sstream>
-#include <string>
-#include <vector>
-#include "apb_types.hpp"
 
-std::string format_double_stat_detail(double val, int precision = 2);
+#include <cstdint>
+#include <set>
+#include "apb_types.hpp"  // 為了使用 APBSystem::CompleterID 或地址常數
+
+namespace APBSystem {
+
 class Statistics {
    public:
     Statistics();
 
-    void record_transaction_completion(const APBSystem::TransactionData& tx_data);
+    // 記錄 APB 交易 (由 ApbAnalyzer 呼叫)
+    // duration_pclk_edges: 交易持續的 PCLK 上升沿數量
+    void record_read_transaction(bool had_wait_states, uint64_t duration_pclk_edges);
+    void record_write_transaction(bool had_wait_states, uint64_t duration_pclk_edges);
 
-    // Finalize CPU time measurement (call this before generating report)
-    void finalize_processing();
+    // 記錄 PCLK 週期類型 (由 ApbAnalyzer 或 main 在適當時機呼叫)
+    void record_bus_active_pclk_edge();  // 每當 PSEL 為高且 PCLK 上升沿發生時
 
-    void record_pclk_cycle();
-    void record_idle_cycle();
-    void record_active_bus_cycle();
+    // 記錄被存取的 Completer (由 ApbAnalyzer 呼叫)
+    void record_completer_access(uint32_t paddr);
 
-    long long get_num_read_no_wait() const { return read_transactions_no_wait_; }
-    long long get_num_read_with_wait() const { return read_transactions_wait_; }
-    long long get_num_write_no_wait() const { return write_transactions_no_wait_; }
-    long long get_num_write_with_wait() const { return write_transactions_wait_; }
+    // 設定總體資訊 (由 main 呼叫)
+    void set_total_pclk_rising_edges(uint64_t total_edges);
+    void set_cpu_elapsed_time_ms(double time_ms);
 
-    double get_average_read_cycle() const;
-    double get_average_write_cycle() const;
+    // --- Getters for ReportGenerator ---
+    // 1. Number of Read Transactions with no wait states
+    uint64_t get_read_transactions_no_wait() const;
+    // 2. Number of Read Transactions with wait states
+    uint64_t get_read_transactions_with_wait() const;
+    // 3. Number of Write Transactions with no wait states
+    uint64_t get_write_transactions_no_wait() const;
+    // 4. Number of Write Transactions with wait states
+    uint64_t get_write_transactions_with_wait() const;
 
-    double get_bus_utilization() const;
-    long long get_num_idle_cycles() const;
+    // 5. Average Read Cycle (以 PCLK 上升沿計數為單位)
+    double get_average_read_cycle_duration() const;
+    // 6. Average Write Cycle (以 PCLK 上升沿計數為單位)
+    double get_average_write_cycle_duration() const;
 
-    int get_num_completers() const;
-    long long get_cpu_elapsed_time_ms() const;
+    // 7. Bus Utilization (%)
+    double get_bus_utilization_percentage() const;
+    // 8. Number of Idle Cycles (PCLK 上升沿計數)
+    uint64_t get_num_idle_pclk_edges() const;
 
-    std::string get_total_pclk_cycles_str() const {
-        return std::to_string(get_total_pclk_cycles_raw());
-    }
-    std::string get_avg_read_cycle_str() const {
-        return format_double_stat_detail(get_average_read_cycle());
-    }
-    std::string get_avg_write_cycle_str() const {
-        return format_double_stat_detail(get_average_write_cycle());
-    }
-    std::string get_bus_utilization_str() const {
-        return format_double_stat_detail(get_bus_utilization());
-    }
-    std::string get_total_idle_cycles_str() const {
-        return std::to_string(get_num_idle_cycles());
-    }
-    std::string get_num_completers_str() const {
-        return std::to_string(get_num_completers());
-    }
-    std::string get_cpu_elapsed_time_ms_str() const {
-        return std::to_string(get_cpu_elapsed_time_ms());
-    }
+    // 9. Number of Completers (指被存取過的獨立 Completer 數量)
+    int get_number_of_unique_completers_accessed() const;
+    // 10. CPU Elapsed Time (ms)
+    double get_cpu_elapsed_time_ms() const;
 
-    // Getter for transactions per completer (for report)
-    std::map<APBSystem::CompleterLogicalID, long long> get_transactions_per_completer() const {
-        return transactions_per_completer_;
-    }
+    // 輔助 getter (可選，用於調試或更詳細的報表)
+    uint64_t get_total_pclk_edges() const;
+    uint64_t get_total_bus_active_pclk_edges() const;
 
-    // Other useful raw value getters for debugging or detailed reports
-    long long get_total_completed_read_transactions() const {
-        return completed_read_transactions_;
-    }
-    long long get_total_completed_write_transactions() const {
-        return completed_write_transactions_;
-    }
-    long long get_total_pclk_cycles_raw() const {
-        return total_pclk_cycles_;
-    }
-    long long get_total_active_bus_cycles_raw() const {
-        return total_bus_active_cycles_;
-    }
+    void set_first_valid_pclk_edge_for_stats(uint64_t first_valid_edge);
 
    private:
-    // General cycle counters
-    long long total_pclk_cycles_;
-    long long total_idle_cycles_;
-    long long total_bus_active_cycles_;
+    uint64_t m_read_transactions_no_wait;
+    uint64_t m_read_transactions_with_wait;
+    uint64_t m_write_transactions_no_wait;
+    uint64_t m_write_transactions_with_wait;
 
-    // Read transaction counters
-    long long completed_read_transactions_;
-    long long sum_read_cycle_durations_;
-    long long read_transactions_no_wait_;
-    long long read_transactions_wait_;
+    uint64_t m_total_pclk_edges_for_read_transactions;
+    uint64_t m_total_pclk_edges_for_write_transactions;
 
-    // Write transaction counters
-    long long completed_write_transactions_;
-    long long sum_write_cycle_durations_;
-    long long write_transactions_no_wait_;
-    long long write_transactions_wait_;
+    uint64_t m_bus_active_pclk_edges;        // PSEL 為高時的 PCLK 上升沿計數
+    uint64_t m_total_simulation_pclk_edges;  // VCD 中的總 PCLK 上升沿計數
 
-    // Completer
-    std::map<APBSystem::CompleterLogicalID, long long> transactions_per_completer_;
-    std::set<APBSystem::CompleterLogicalID> active_completers_;  // Track active completers
+    std::set<CompleterID> m_accessed_completer_ids;
+    // 或者，如果不想使用 CompleterID 枚舉，可以直接儲存 base address:
+    // std::set<uint32_t> m_accessed_completer_base_addrs;
 
-    // CPU Time
-    std::chrono::time_point<std::chrono::high_resolution_clock> start_time_;
-    std::chrono::time_point<std::chrono::high_resolution_clock> end_time_;
-    bool processing_finalized_;
+    double m_cpu_elapsed_time_ms;
+
+    uint64_t m_first_valid_pclk_edge_for_stats;  // 第一個有效的 PCLK 上升沿，用於統計計算
 };
+
+}  // namespace APBSystem

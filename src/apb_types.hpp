@@ -1,13 +1,10 @@
 #pragma once
 
 #include <cstdint>
-#include <optional>
+#include <map>
 #include <string>
-#include <vector>
+
 namespace APBSystem {
-// --- 常數定義 ---
-constexpr int MAX_COMPLETERS = 3;
-constexpr int MAX_TIMEOUT_PCLK_CYCLES = 100;
 
 enum class ApbFsmState {
     IDLE,
@@ -15,83 +12,105 @@ enum class ApbFsmState {
     ACCESS
 };
 
-// Structure to hold current values of relevant APB signals
-struct SignalValues {
-    bool PCLK_posedge = false;  // True if this is a posedge of PCLK
-    bool PRESETn = true;        // Default to de-asserted
-    uint32_t PADDR = 0;
-    bool PSEL_UART = false;
-    bool PSEL_GPIO = false;
-    bool PSEL_SPI_MASTER = false;
-    // Helper to check if any PSEL is active
-    bool is_any_psel_active() const {
-        return PSEL_UART || PSEL_GPIO || PSEL_SPI_MASTER;
-    }
-    bool PENABLE = false;
-    bool PWRITE = false;
-    uint32_t PWDATA = 0;
-    uint32_t PRDATA = 0;
-    bool PREADY = false;
-};
-enum class CompleterLogicalID : int { UART = 0,
-                                      GPIO = 1,
-                                      SPI_MASTER = 2,
-                                      UNKNOWN = -1 };
-
-// Structure to hold data for a completed transaction (focused on statistics)
-struct TransactionData {
-    long long transaction_id_ = 0;
-    long long start_time_ = 0;  // VCD timestamp or PCLK cycle count
-    long long end_time_ = 0;    // VCD timestamp or PCLK cycle count
-
-    uint32_t paddr_ = 0;
-    bool is_write_ = false;
-    std::optional<uint32_t> pwdata_ = std::nullopt;
-    std::optional<uint32_t> prdata_ = std::nullopt;
-
-    enum class Status { OK,
-                        ERROR } status_ = Status::OK;  // Basic status
-
-    CompleterLogicalID completer_id_ = CompleterLogicalID::UNKNOWN;
-
-    int duration_pclk_cycles_ = 0;  // Total PCLK cycles for the transaction (Setup + Access)
-    bool has_wait_states_ = false;  // True if access phase > 1 PCLK cycle
+enum class CompleterID {
+    UART,
+    GPIO,
+    SPI_MASTER,
+    UNKNOWN_COMPLETER
 };
 
-// Structure for basic error reporting (can be kept simple)
-struct ErrorDescriptor {
-    long long timestamp = 0;
-    std::string error_type_key;  // e.g., "E01", "E02" (from problem spec)
-    std::string message;
-    // Optionally, add paddr or other context
+const uint32_t UART_BASE_ADDR = 0x1A100000;
+const uint32_t UART_END_ADDR = 0x1A100FFF;
+const uint32_t GPIO_BASE_ADDR = 0x1A101000;
+const uint32_t GPIO_END_ADDR = 0x1A101FFF;
+const uint32_t SPI_MASTER_BASE_ADDR = 0x1A102000;
+const uint32_t SPI_MASTER_END_ADDR = 0x1A102FFF;
+
+struct TransactionInfo {
+    bool active = false;
+    uint64_t start_pclk_edge_count = 0;      // 交易開始的 PCLK 上升沿計數
+    uint64_t transaction_start_time_ps = 0;  // 交易開始的 VCD 時間戳 (PSEL拉高時)
+    bool is_write = false;
+    uint32_t paddr = 0;
+    bool had_wait_state = false;
+
+    void reset() {
+        active = false;
+        start_pclk_edge_count = 0;
+        transaction_start_time_ps = 0;
+        is_write = false;
+        paddr = 0;
+        had_wait_state = false;
+    }
 };
 
-inline CompleterLogicalID get_completer_type_from_address(unsigned int paddr) {
-    if (paddr >= 0x1A100000 && paddr <= 0x1A100FFF) {  // UART
-        return CompleterLogicalID::UART;
-    }
-    if (paddr >= 0x1A101000 && paddr <= 0x1A101FFF) {  // GPIO
-        return CompleterLogicalID::GPIO;
-    }
-    if (paddr >= 0x1A102000 && paddr <= 0x1A102FFF) {  // SPI_MASTER
-        return CompleterLogicalID::SPI_MASTER;
-    }
-    return CompleterLogicalID::UNKNOWN;
-}
+struct SignalState {
+    uint64_t timestamp_ps = 0;  // 當前狀態對應的 VCD 時間戳
 
-inline std::string completer_id_to_string(CompleterLogicalID id) {
-    switch (id) {
-        case CompleterLogicalID::UART:
-            return "UART";
-        case CompleterLogicalID::GPIO:
-            return "GPIO";
-        case CompleterLogicalID::SPI_MASTER:
-            return "SPI_MASTER";
-        case CompleterLogicalID::UNKNOWN:
-            return "UNKNOWN";
-        default:
-            return "INVALID_COMPLETER_ID";
+    // APB Interface Signals
+    bool pclk = false;
+    bool presetn = true;
+    uint32_t paddr = 0;
+    bool paddr_has_x = false;  // 標記 paddr 是否包含 'x'
+    bool pwrite = false;
+    bool pwrite_has_x = false;
+    bool psel = false;
+    bool psel_has_x = false;  // 標記 psel 是否為 'x'
+    bool penable = false;
+    bool penable_has_x = false;  // 標記 penable 是否為 'x'
+    uint32_t pwdata = 0;
+    bool pwdata_has_x = false;   // 標記 pwdata 是否包含 'x'
+    uint32_t prdata = 0;         // 由 Completer 驅動
+    bool prdata_has_x = false;   // 標記 prdata 是否包含 'x'
+    bool pready = false;         // 由 Completer 驅動
+    bool pready_has_x = false;   // 標記 pready 是否為 'x'
+    bool pslverr = false;        // 由 Completer 驅動
+    bool pslverr_has_x = false;  // 標記 pslverr 是否為 'x'
+
+    SignalState() {  // 初始化構造函式
+        pclk = false;
+        presetn = false;  // 假設初始在復位狀態，VCD dumpvars 顯示 rst_n = 0
+        paddr = 0;
+        paddr_has_x = true;  // 初始地址未知是合理的
+        pwrite = false;
+        pwrite_has_x = true;
+        psel = false;
+        psel_has_x = true;
+        penable = false;
+        penable_has_x = true;
+        pwdata = 0;
+        pwdata_has_x = true;
+        prdata = 0;
+        prdata_has_x = true;
+        pready = false;
+        pready_has_x = true;
+        pslverr = false;
+        pslverr_has_x = true;
     }
-}
+};
+
+// VCD 中訊號的物理類型 (用於 SignalManager 內部判斷)
+enum class VcdSignalPhysicalType {
+    PCLK,
+    PRESETN,
+    PADDR,
+    PWRITE,
+    PSEL,
+    PENABLE,
+    PWDATA,
+    PRDATA,
+    PREADY,
+    PSLVERR,
+    PARAMETER,
+    OTHER  // 其他 VCD 變數類型
+};
+
+// 儲存 VCD 中訊號定義的資訊 (用於 SignalManager)
+struct VcdSignalInfo {
+    std::string hierarchical_name;
+    VcdSignalPhysicalType type = VcdSignalPhysicalType::OTHER;
+    int bit_width = 1;
+    // std::string vcd_id_code; // VCD ID Code (例如 '#', '%') -> 這個將作為 map 的 key
+};
 
 }  // namespace APBSystem

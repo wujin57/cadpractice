@@ -1,102 +1,157 @@
 #include "statistics.hpp"
-#include <cmath>
-#include <numeric>
+#include <limits>  // 用於處理除以零的情況
 
-std::string format_double_stat_detail(double val, int precision = 2) {
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(precision) << val;
-    return oss.str();
-}
+namespace APBSystem {
 
 Statistics::Statistics()
-    : total_pclk_cycles_(0),
-      total_idle_cycles_(0),
-      total_bus_active_cycles_(0),
-      completed_read_transactions_(0),
-      sum_read_cycle_durations_(0),
-      read_transactions_no_wait_(0),
-      read_transactions_wait_(0),
-      completed_write_transactions_(0),
-      sum_write_cycle_durations_(0),
-      write_transactions_no_wait_(0),
-      write_transactions_wait_(0),
-      processing_finalized_(false) {
-    start_time_ = std::chrono::high_resolution_clock::now();
+    : m_read_transactions_no_wait(0),
+      m_read_transactions_with_wait(0),
+      m_write_transactions_no_wait(0),
+      m_write_transactions_with_wait(0),
+      m_total_pclk_edges_for_read_transactions(0),
+      m_total_pclk_edges_for_write_transactions(0),
+      m_bus_active_pclk_edges(0),
+      m_total_simulation_pclk_edges(0),
+      m_cpu_elapsed_time_ms(0.0),
+      m_first_valid_pclk_edge_for_stats(0) {}
 
-    transactions_per_completer_[APBSystem::CompleterLogicalID::UART] = 0;
-    transactions_per_completer_[APBSystem::CompleterLogicalID::GPIO] = 0;
-    transactions_per_completer_[APBSystem::CompleterLogicalID::SPI_MASTER] = 0;
-    transactions_per_completer_[APBSystem::CompleterLogicalID::UNKNOWN] = 0;
-}
-
-void Statistics::record_pclk_cycle() {
-    total_pclk_cycles_++;
-}
-
-void Statistics::record_idle_cycle() {
-    total_idle_cycles_++;
-}
-void Statistics::record_active_bus_cycle() {
-    total_bus_active_cycles_++;
-}
-
-void Statistics::record_transaction_completion(const APBSystem::TransactionData& tx_data) {
-    if (tx_data.completer_id_ != APBSystem::CompleterLogicalID::UNKNOWN) {
-        active_completers_.insert(tx_data.completer_id_);
-        transactions_per_completer_[tx_data.completer_id_]++;
-    }
-    if (tx_data.is_write_) {
-        completed_write_transactions_++;
-        sum_write_cycle_durations_ += tx_data.duration_pclk_cycles_;
-        if (tx_data.has_wait_states_) {
-            write_transactions_wait_++;
-        } else {
-            write_transactions_no_wait_++;
-        }
-    } else {  // read
-        completed_read_transactions_++;
-        sum_read_cycle_durations_ += tx_data.duration_pclk_cycles_;
-        if (tx_data.has_wait_states_) {
-            read_transactions_wait_++;
-        } else {
-            read_transactions_no_wait_++;
-        }
+void Statistics::record_read_transaction(bool had_wait_states, uint64_t duration_pclk_edges) {
+    m_total_pclk_edges_for_read_transactions += duration_pclk_edges;
+    if (had_wait_states) {
+        m_read_transactions_with_wait++;
+    } else {
+        m_read_transactions_no_wait++;
     }
 }
 
-void Statistics::finalize_processing() {
-    if (!processing_finalized_) {
-        end_time_ = std::chrono::high_resolution_clock::now();
-        processing_finalized_ = true;
+void Statistics::record_write_transaction(bool had_wait_states, uint64_t duration_pclk_edges) {
+    m_total_pclk_edges_for_write_transactions += duration_pclk_edges;
+    if (had_wait_states) {
+        m_write_transactions_with_wait++;
+    } else {
+        m_write_transactions_no_wait++;
     }
 }
 
-double Statistics::get_average_read_cycle() const {
-    if (completed_read_transactions_ == 0)
+void Statistics::record_bus_active_pclk_edge() {
+    m_bus_active_pclk_edges++;
+}
+
+void Statistics::record_completer_access(uint32_t paddr) {
+    if (paddr >= UART_BASE_ADDR && paddr <= UART_END_ADDR) {
+        m_accessed_completer_ids.insert(CompleterID::UART);
+    } else if (paddr >= GPIO_BASE_ADDR && paddr <= GPIO_END_ADDR) {
+        m_accessed_completer_ids.insert(CompleterID::GPIO);
+    } else if (paddr >= SPI_MASTER_BASE_ADDR && paddr <= SPI_MASTER_END_ADDR) {
+        m_accessed_completer_ids.insert(CompleterID::SPI_MASTER);
+    } else {
+        m_accessed_completer_ids.insert(CompleterID::UNKNOWN_COMPLETER);
+    }
+}
+
+void Statistics::set_total_pclk_rising_edges(uint64_t total_edges) {
+    m_total_simulation_pclk_edges = total_edges;
+}
+
+void Statistics::set_cpu_elapsed_time_ms(double time_ms) {
+    m_cpu_elapsed_time_ms = time_ms;
+}
+
+void Statistics::set_first_valid_pclk_edge_for_stats(uint64_t first_valid_edge) {
+    m_first_valid_pclk_edge_for_stats = first_valid_edge;
+}
+
+// --- Getters ---
+uint64_t Statistics::get_read_transactions_no_wait() const {
+    return m_read_transactions_no_wait;
+}
+uint64_t Statistics::get_read_transactions_with_wait() const {
+    return m_read_transactions_with_wait;
+}
+uint64_t Statistics::get_write_transactions_no_wait() const {
+    return m_write_transactions_no_wait;
+}
+uint64_t Statistics::get_write_transactions_with_wait() const {
+    return m_write_transactions_with_wait;
+}
+
+double Statistics::get_average_read_cycle_duration() const {
+    uint64_t total_reads = m_read_transactions_no_wait + m_read_transactions_with_wait;
+    if (total_reads == 0)
         return 0.0;
-    return static_cast<double>(sum_read_cycle_durations_) / completed_read_transactions_;
-}
-double Statistics::get_average_write_cycle() const {
-    if (completed_write_transactions_ == 0)
-        return 0.0;
-    return static_cast<double>(sum_write_cycle_durations_) / completed_write_transactions_;
-}
-double Statistics::get_bus_utilization() const {
-    if (total_pclk_cycles_ == 0)
-        return 0.0;
-    return static_cast<double>(total_bus_active_cycles_) / total_pclk_cycles_;
-}
-long long Statistics::get_num_idle_cycles() const {
-    return total_idle_cycles_;
-}
-int Statistics::get_num_completers() const {
-    return static_cast<int>(active_completers_.size());
+    return static_cast<double>(m_total_pclk_edges_for_read_transactions) / total_reads;
 }
 
-long long Statistics::get_cpu_elapsed_time_ms() const {
-    if (!processing_finalized_) {
-        auto temp_end_time = std::chrono::high_resolution_clock::now();
-        return std::chrono::duration_cast<std::chrono::milliseconds>(temp_end_time - start_time_).count();
-    }
-    return std::chrono::duration_cast<std::chrono::milliseconds>(end_time_ - start_time_).count();
+double Statistics::get_average_write_cycle_duration() const {
+    uint64_t total_writes = m_write_transactions_no_wait + m_write_transactions_with_wait;
+    if (total_writes == 0)
+        return 0.0;
+    return static_cast<double>(m_total_pclk_edges_for_write_transactions) / total_writes;
 }
+
+double Statistics::get_bus_utilization_percentage() const {
+    if (m_total_simulation_pclk_edges == 0)
+        return 0.0;
+    uint64_t effective_total_edges = 0;
+    if (m_first_valid_pclk_edge_for_stats > 0 && m_first_valid_pclk_edge_for_stats <= m_total_simulation_pclk_edges) {
+        effective_total_edges = m_total_simulation_pclk_edges - m_first_valid_pclk_edge_for_stats + 1;
+    } else {
+        // 如果 m_first_valid_pclk_edge_for_stats 無效 (例如一直處於復位，或VCD沒有PCLK上升沿)
+        // 則有效分析週期為0，利用率也為0
+        // 或者，如果測試案例期望此時 Bus Util 基於 VCD 總 PCLK 數，則用 m_total_simulation_pclk_edges
+        // 但為了匹配 Idle Cycles 的調整，這裡應該讓分母也對應有效區間
+        return 0.0;  // 或者如果 m_total_simulation_pclk_edges > 0 且 m_first_valid_pclk_edge_for_stats == 0
+                     // 可以理解為從未脫離復位，所以有效利用率為0
+    }
+
+    if (effective_total_edges == 0)
+        return 0.0;
+
+    // m_bus_active_pclk_edges 已經是只計算復位結束後的活動了
+    return (static_cast<double>(m_bus_active_pclk_edges) / effective_total_edges) * 100.0;
+}
+
+uint64_t Statistics::get_num_idle_pclk_edges() const {
+    if (m_total_simulation_pclk_edges == 0)
+        return 0;
+
+    uint64_t effective_total_edges = 0;
+    if (m_first_valid_pclk_edge_for_stats > 0 && m_first_valid_pclk_edge_for_stats <= m_total_simulation_pclk_edges) {
+        // pclk_edge_count 從 1 開始計，所以 first_valid 是第 N 個邊沿
+        // 例如 total=100, first_valid=21, effective = 100-21+1 = 80 (即第21到第100個邊沿)
+        effective_total_edges = m_total_simulation_pclk_edges - m_first_valid_pclk_edge_for_stats + 1;
+    } else {
+        // 如果 m_first_valid_pclk_edge_for_stats 無效 (例如一直處於復位)
+        // 則有效分析週期為0，Idle也為0
+        // 或者，如果測試案例期望此時 Idle 是 m_total_simulation_pclk_edges - m_bus_active_pclk_edges
+        // (這種情況下 bus_active 會是0，Idle 就是 m_total_simulation_pclk_edges)
+        // 為了匹配，這裡應該返回0，因為沒有有效的分析區間
+        return 0;  // 如果從未脫離復位，則有效Idle週期為0
+    }
+
+    if (effective_total_edges < m_bus_active_pclk_edges) {
+        // std::cerr << "Warning: effective_total_edges < m_bus_active_pclk_edges in get_num_idle_pclk_edges. "
+        //           << "Effective: " << effective_total_edges << ", Active: " << m_bus_active_pclk_edges
+        //           << ", TotalSim: " << m_total_simulation_pclk_edges << ", FirstValid: " << m_first_valid_pclk_edge_for_stats << std::endl;
+        return 0;  // 防禦性
+    }
+    return effective_total_edges - m_bus_active_pclk_edges;
+}
+
+int Statistics::get_number_of_unique_completers_accessed() const {
+    return m_accessed_completer_ids.size();
+}
+
+double Statistics::get_cpu_elapsed_time_ms() const {
+    return m_cpu_elapsed_time_ms;
+}
+
+uint64_t Statistics::get_total_pclk_edges() const {
+    return m_total_simulation_pclk_edges;
+}
+
+uint64_t Statistics::get_total_bus_active_pclk_edges() const {
+    return m_bus_active_pclk_edges;
+}
+
+}  // namespace APBSystem

@@ -20,7 +20,10 @@ set(SOURCES
     src/signal_manager.cpp
     src/signal_manager.hpp
     src/statistics.cpp
-    src/statistics.hpp)
+    src/statistics.hpp
+    src/report_generator.cpp
+    src/report_generator.hpp)
+
 
 
 add_executable(${PROJECT_NAME} ${SOURCES})
