@@ -48,8 +48,6 @@ VcdSignalPhysicalType SignalManager::deduce_physical_type_from_name(const std::s
         return VcdSignalPhysicalType::PRDATA;
     if (name_suffix == "pready")
         return VcdSignalPhysicalType::PREADY;
-    if (name_suffix == "pslverr")
-        return VcdSignalPhysicalType::PSLVERR;
 
     // std::cerr << "Warning: Unknown signal type for name suffix: " << name_suffix << " (full: " << hierarchical_name << ")" << std::endl;
     return VcdSignalPhysicalType::OTHER;
@@ -205,10 +203,6 @@ bool SignalManager::update_state_on_signal_change(
         case VcdSignalPhysicalType::PREADY:
             current_overall_state.pready = (new_uint_val != 0);
             current_overall_state.pready_has_x = val_has_x;
-            break;
-        case VcdSignalPhysicalType::PSLVERR:
-            current_overall_state.pslverr = (new_uint_val != 0);
-            current_overall_state.pslverr_has_x = val_has_x;
             break;
         case VcdSignalPhysicalType::PARAMETER:
         case VcdSignalPhysicalType::OTHER:

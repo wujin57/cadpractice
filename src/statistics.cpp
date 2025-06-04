@@ -1,6 +1,6 @@
 #include "statistics.hpp"
-#include <limits>  // 用於處理除以零的情況
-
+#include <algorithm>  // 用於 std::find
+#include <limits>     // 用於處理除以零的情況
 namespace APBSystem {
 
 Statistics::Statistics()
@@ -38,17 +38,34 @@ void Statistics::record_bus_active_pclk_edge() {
 }
 
 void Statistics::record_completer_access(uint32_t paddr) {
+    CompleterID current_completer;
     if (paddr >= UART_BASE_ADDR && paddr <= UART_END_ADDR) {
-        m_accessed_completer_ids.insert(CompleterID::UART);
+        current_completer = CompleterID::UART;
     } else if (paddr >= GPIO_BASE_ADDR && paddr <= GPIO_END_ADDR) {
-        m_accessed_completer_ids.insert(CompleterID::GPIO);
+        current_completer = CompleterID::GPIO;
     } else if (paddr >= SPI_MASTER_BASE_ADDR && paddr <= SPI_MASTER_END_ADDR) {
-        m_accessed_completer_ids.insert(CompleterID::SPI_MASTER);
+        current_completer = CompleterID::SPI_MASTER;
     } else {
-        m_accessed_completer_ids.insert(CompleterID::UNKNOWN_COMPLETER);
+        current_completer = CompleterID::UNKNOWN_COMPLETER;
+    }
+    // 1. 更新獨立 Completer 集合
+    m_accessed_completer_ids_set.insert(current_completer);
+
+    if (std::find(m_ordered_accessed_completers.begin(), m_ordered_accessed_completers.end(), current_completer) == m_ordered_accessed_completers.end()) {
+        if (current_completer != CompleterID::UNKNOWN_COMPLETER ||
+            (current_completer == CompleterID::UNKNOWN_COMPLETER && m_completer_transaction_counts[CompleterID::UNKNOWN_COMPLETER] == 0)) {
+            m_ordered_accessed_completers.push_back(current_completer);
+        }
+    }
+
+    // 3. 更新該 Completer 的交易計數
+    m_completer_transaction_counts[current_completer]++;
+
+    // 4. 確保 m_completer_bit_activity_map 中有該 completer 的條目
+    if (m_completer_bit_activity_map.find(current_completer) == m_completer_bit_activity_map.end()) {
+        m_completer_bit_activity_map[current_completer] = CompleterBitActivity();
     }
 }
-
 void Statistics::set_total_pclk_rising_edges(uint64_t total_edges) {
     m_total_simulation_pclk_edges = total_edges;
 }
@@ -139,7 +156,7 @@ uint64_t Statistics::get_num_idle_pclk_edges() const {
 }
 
 int Statistics::get_number_of_unique_completers_accessed() const {
-    return m_accessed_completer_ids.size();
+    return m_accessed_completer_ids_set.size();
 }
 
 double Statistics::get_cpu_elapsed_time_ms() const {
@@ -152,6 +169,12 @@ uint64_t Statistics::get_total_pclk_edges() const {
 
 uint64_t Statistics::get_total_bus_active_pclk_edges() const {
     return m_bus_active_pclk_edges;
+}
+const std::map<APBSystem::CompleterID, CompleterBitActivity>& Statistics::get_completer_bit_activity_map() const {
+    return m_completer_bit_activity_map;
+}
+const std::vector<CompleterID>& Statistics::get_ordered_accessed_completers() const {
+    return m_ordered_accessed_completers;
 }
 
 }  // namespace APBSystem

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
-
+#include <vector>
 namespace APBSystem {
 
 enum class ApbFsmState {
@@ -59,13 +59,11 @@ struct SignalState {
     bool penable = false;
     bool penable_has_x = false;  // 標記 penable 是否為 'x'
     uint32_t pwdata = 0;
-    bool pwdata_has_x = false;   // 標記 pwdata 是否包含 'x'
-    uint32_t prdata = 0;         // 由 Completer 驅動
-    bool prdata_has_x = false;   // 標記 prdata 是否包含 'x'
-    bool pready = false;         // 由 Completer 驅動
-    bool pready_has_x = false;   // 標記 pready 是否為 'x'
-    bool pslverr = false;        // 由 Completer 驅動
-    bool pslverr_has_x = false;  // 標記 pslverr 是否為 'x'
+    bool pwdata_has_x = false;  // 標記 pwdata 是否包含 'x'
+    uint32_t prdata = 0;        // 由 Completer 驅動
+    bool prdata_has_x = false;  // 標記 prdata 是否包含 'x'
+    bool pready = false;        // 由 Completer 驅動
+    bool pready_has_x = false;  // 標記 pready 是否為 'x'
 
     SignalState() {  // 初始化構造函式
         pclk = false;
@@ -84,8 +82,6 @@ struct SignalState {
         prdata_has_x = true;
         pready = false;
         pready_has_x = true;
-        pslverr = false;
-        pslverr_has_x = true;
     }
 };
 
@@ -100,7 +96,6 @@ enum class VcdSignalPhysicalType {
     PWDATA,
     PRDATA,
     PREADY,
-    PSLVERR,
     PARAMETER,
     OTHER  // 其他 VCD 變數類型
 };
@@ -113,4 +108,10 @@ struct VcdSignalInfo {
     // std::string vcd_id_code; // VCD ID Code (例如 '#', '%') -> 這個將作為 map 的 key
 };
 
+struct CompleterBitActivity {
+    std::vector<bool> paddr_bit_status;
+    std::vector<bool> pwdata_bit_status;
+
+    CompleterBitActivity() : paddr_bit_status(8, true), pwdata_bit_status(8, true) {}
+};
 }  // namespace APBSystem

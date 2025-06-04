@@ -12,22 +12,11 @@ class SignalManager {
    public:
     SignalManager();
 
-    // 註冊在 VCD $var 中定義的訊號
-    // @param vcd_id_code: VCD 中的訊號 ID (例如 '#', '%')
-    // @param type_str: VCD 中的類型字串 ("wire", "reg", "parameter")
-    // @param width: 訊號位元寬度
-    // @param hierarchical_name: VCD 中訊號的完整層次化名稱
     void register_signal(const std::string& vcd_id_code,
                          const std::string& type_str,
                          int width,
                          const std::string& hierarchical_name);
 
-    // 當 VcdParser 讀到一個訊號值變化時，調用此函式來更新 SignalState
-    // @param vcd_id_code: 發生變化的訊號的 VCD ID
-    // @param value_str: 從 VCD 讀取的該訊號的新值字串
-    // @param current_overall_state: 代表當前所有 APB 訊號狀態的物件，將被此函式修改
-    // @param previous_pclk_val: (in/out) 上一個時間點的 PCLK 值，用於檢測邊沿，並在 PCLK 更新時被修改
-    // @return: 如果此次事件導致了 PCLK 的上升沿 (0 -> 1)，則返回 true
     bool update_state_on_signal_change(
         const std::string& vcd_id_code,
         const std::string& value_str,

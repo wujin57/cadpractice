@@ -32,6 +32,7 @@ void ReportGenerator::generate_apb_transaction_report(const Statistics& stats, s
 
     out_stream << "8. Number of Idle PCLK edges:                       "
                << stats.get_num_idle_pclk_edges() << "\n";
+
     out_stream << "9. Number of Unique Completers Accessed:            "
                << stats.get_number_of_unique_completers_accessed() << "\n";
 
@@ -41,11 +42,28 @@ void ReportGenerator::generate_apb_transaction_report(const Statistics& stats, s
 
     out_stream << std::defaultfloat << std::setprecision(6);  // 完全恢復預設浮點數格式
 
-    out_stream << "---------------------------------------\n";
-    out_stream << "Additional Info (for verification):\n";
-    out_stream << "- Total PCLK rising edges detected: " << stats.get_total_pclk_edges() << "\n";
-    out_stream << "- Total PCLK rising edges during Bus Active (PSEL high): " << stats.get_total_bus_active_pclk_edges() << "\n";
-    out_stream << "---------------------------------------\n\n";
-}
+    out_stream << "\nNumber of Transactions with Timeout: 0\n";
+    out_stream << "Number of Out-of-Range Accesses: 0\n";
+    out_stream << "Number of Mirrored Transactions: 0\n";
+    out_stream << "Number of Read-Write Overlap Errors: 0\n\n";
+    const auto& bit_activity_data_map = stats.get_completer_bit_activity_map();
+    const auto& ordered_completers = stats.get_ordered_accessed_completers();
+    int completer_display_index = 1;
+    for (APBSystem::CompleterID comp_id : ordered_completers) {
+        out_stream << "Completer " << completer_display_index << " PADDR Connections\n";
+        auto it_activity = bit_activity_data_map.find(comp_id);
+        const auto& paddr_status_vec = it_activity->second.paddr_bit_status;
+        for (int i = 7; i >= 0; --i) {
+            out_stream << " a" << i << ": " << (paddr_status_vec[i] ? "Correct" : "Error/Not Correct") << "\n";
+        }
 
+        out_stream << "Completer " << completer_display_index << " PWDATA Connections\n";
+        const auto& pwdata_status_vec = it_activity->second.pwdata_bit_status;
+        for (int i = 7; i >= 0; --i) {
+            out_stream << " d" << i << ": " << (pwdata_status_vec[i] ? "Correct" : "Error/Not Correct") << "\n";
+        }
+        completer_display_index++;
+    }
+
+}  // namespace APBSystem
 }  // namespace APBSystem

@@ -6,5 +6,5 @@ CXX_DEFINES =
 
 CXX_INCLUDES = -I/home/ICCAD/src
 
-CXX_FLAGS = -std=c++17
+CXX_FLAGS = -std=c++11
 
