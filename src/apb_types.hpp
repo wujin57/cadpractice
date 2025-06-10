@@ -16,7 +16,8 @@ enum class CompleterID {
     UART,
     GPIO,
     SPI_MASTER,
-    UNKNOWN_COMPLETER
+    UNKNOWN_COMPLETER,
+    NONE
 };
 
 const uint32_t UART_BASE_ADDR = 0x1A100000;
@@ -28,11 +29,16 @@ const uint32_t SPI_MASTER_END_ADDR = 0x1A102FFF;
 
 struct TransactionInfo {
     bool active = false;
-    uint64_t start_pclk_edge_count = 0;      // 交易開始的 PCLK 上升沿計數
+    uint64_t start_pclk_edge_count = 0;
     uint64_t transaction_start_time_ps = 0;  // 交易開始的 VCD 時間戳 (PSEL拉高時)
     bool is_write = false;
     uint32_t paddr = 0;
+    bool paddr_val_has_x = false;
+    uint32_t pwdata_val = 0;
+    bool pwdata_val_has_x = false;
     bool had_wait_state = false;
+    CompleterID target_completer = CompleterID::NONE;
+    bool is_out_of_range = false;
 
     void reset() {
         active = false;
@@ -40,36 +46,39 @@ struct TransactionInfo {
         transaction_start_time_ps = 0;
         is_write = false;
         paddr = 0;
+        paddr_val_has_x = false;
+        pwdata_val = 0;
+        pwdata_val_has_x = false;
         had_wait_state = false;
+        target_completer = CompleterID::NONE;
+        is_out_of_range = false;
     }
 };
 
 struct SignalState {
-    uint64_t timestamp_ps = 0;  // 當前狀態對應的 VCD 時間戳
-
-    // APB Interface Signals
+    uint64_t timestamp_ps = 0;
     bool pclk = false;
     bool presetn = true;
     uint32_t paddr = 0;
-    bool paddr_has_x = false;  // 標記 paddr 是否包含 'x'
+    bool paddr_has_x = false;
     bool pwrite = false;
     bool pwrite_has_x = false;
     bool psel = false;
-    bool psel_has_x = false;  // 標記 psel 是否為 'x'
+    bool psel_has_x = false;
     bool penable = false;
-    bool penable_has_x = false;  // 標記 penable 是否為 'x'
+    bool penable_has_x = false;
     uint32_t pwdata = 0;
-    bool pwdata_has_x = false;  // 標記 pwdata 是否包含 'x'
-    uint32_t prdata = 0;        // 由 Completer 驅動
-    bool prdata_has_x = false;  // 標記 prdata 是否包含 'x'
-    bool pready = false;        // 由 Completer 驅動
-    bool pready_has_x = false;  // 標記 pready 是否為 'x'
+    bool pwdata_has_x = false;
+    uint32_t prdata = 0;
+    bool prdata_has_x = false;
+    bool pready = false;
+    bool pready_has_x = false;
 
-    SignalState() {  // 初始化構造函式
+    SignalState() {
         pclk = false;
-        presetn = false;  // 假設初始在復位狀態，VCD dumpvars 顯示 rst_n = 0
+        presetn = false;
         paddr = 0;
-        paddr_has_x = true;  // 初始地址未知是合理的
+        paddr_has_x = true;
         pwrite = false;
         pwrite_has_x = true;
         psel = false;
@@ -85,7 +94,6 @@ struct SignalState {
     }
 };
 
-// VCD 中訊號的物理類型 (用於 SignalManager 內部判斷)
 enum class VcdSignalPhysicalType {
     PCLK,
     PRESETN,
@@ -97,21 +105,69 @@ enum class VcdSignalPhysicalType {
     PRDATA,
     PREADY,
     PARAMETER,
-    OTHER  // 其他 VCD 變數類型
+    OTHER
 };
-
-// 儲存 VCD 中訊號定義的資訊 (用於 SignalManager)
+enum class BitConnectionStatus {
+    CORRECT,
+    SHORTED
+};
 struct VcdSignalInfo {
     std::string hierarchical_name;
     VcdSignalPhysicalType type = VcdSignalPhysicalType::OTHER;
     int bit_width = 1;
-    // std::string vcd_id_code; // VCD ID Code (例如 '#', '%') -> 這個將作為 map 的 key
+};
+struct BitDetailStatus {
+    BitConnectionStatus status;
+    int shorted_with_bit_index;
+
+    BitDetailStatus() : status(BitConnectionStatus::CORRECT), shorted_with_bit_index(-1) {}
+    BitDetailStatus(BitConnectionStatus s)
+        : status(s), shorted_with_bit_index(-1) {}
 };
 
 struct CompleterBitActivity {
-    std::vector<bool> paddr_bit_status;
-    std::vector<bool> pwdata_bit_status;
+    std::vector<BitDetailStatus> paddr_bit_details;   // 固定8位
+    std::vector<BitDetailStatus> pwdata_bit_details;  // 固定8位
 
-    CompleterBitActivity() : paddr_bit_status(8, true), pwdata_bit_status(8, true) {}
+    CompleterBitActivity()
+        : paddr_bit_details(8),  // 預設建構 BitDetailStatus (status=CORRECT, shorted_with_bit=-1)
+          pwdata_bit_details(8) {}
+};
+struct OutOfRangeAccessDetail {
+    uint64_t timestamp_ps;
+    uint32_t paddr;
+    CompleterID target_completer;
+    bool is_write_transaction;
+    bool prdata_had_x_on_oor_read;  // 仍然記錄 OOR 時 PRDATA 是否有 'x'
+};
+
+// 用於儲存原始 PADDR 和 PWDATA 值的樣本，以供短路分析
+struct CompleterRawDataSamples {
+    std::vector<uint32_t> paddr_samples;   // 只儲存不含 'x' 的 PADDR 值
+    std::vector<uint32_t> pwdata_samples;  // 只儲存不含 'x' 的 PWDATA 值 (僅寫交易)
+};
+
+struct TransactionTimeoutDetail {
+    uint64_t start_timestamp_ps;
+    uint64_t timeout_timestamp_ps;
+    uint32_t paddr;
+    uint64_t exceeded_cycles;
+};
+
+struct DataIntegrityErrorDetail {
+    uint64_t timestamp_ps;
+    uint32_t paddr;
+    uint32_t expected_data;
+    uint32_t received_data;
+    CompleterID target_completer;
+
+    bool is_mirroring_suspected;
+    uint32_t original_write_addr;
+    uint64_t original_write_time;
+};
+
+struct ReverseWriteInfo {
+    uint32_t address;
+    uint64_t timestamp;
 };
 }  // namespace APBSystem

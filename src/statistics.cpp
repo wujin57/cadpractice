@@ -1,6 +1,7 @@
 #include "statistics.hpp"
 #include <algorithm>  // 用於 std::find
 #include <limits>     // 用於處理除以零的情況
+#include <set>
 namespace APBSystem {
 
 Statistics::Statistics()
@@ -13,7 +14,11 @@ Statistics::Statistics()
       m_bus_active_pclk_edges(0),
       m_total_simulation_pclk_edges(0),
       m_cpu_elapsed_time_ms(0.0),
-      m_first_valid_pclk_edge_for_stats(0) {}
+      m_first_valid_pclk_edge_for_stats(0),
+      m_out_of_range_access_count(0),
+      m_timeout_error_count(0),
+      m_data_corruption_count(0),
+      m_mirroring_error_count(0) {}
 
 void Statistics::record_read_transaction(bool had_wait_states, uint64_t duration_pclk_edges) {
     m_total_pclk_edges_for_read_transactions += duration_pclk_edges;
@@ -32,40 +37,188 @@ void Statistics::record_write_transaction(bool had_wait_states, uint64_t duratio
         m_write_transactions_no_wait++;
     }
 }
+void Statistics::record_timeout_error(const TransactionTimeoutDetail& detail) {
+    m_timeout_error_count++;
+    m_timeout_error_details.push_back(detail);
+}
 
+void Statistics::add_paddr_sample(CompleterID completer, uint32_t paddr_value) {
+    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
+        return;
+
+    // 確保 Completer 已被記錄
+    record_accessed_completer(completer);
+
+    m_completer_raw_data_samples[completer].paddr_samples.push_back(paddr_value);
+}
+void Statistics::add_pwdata_sample(CompleterID completer, uint32_t data_value) {
+    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
+        return;
+
+    record_accessed_completer(completer);
+
+    m_completer_raw_data_samples[completer].pwdata_samples.push_back(data_value);
+}
+
+void Statistics::add_data_bus_sample(CompleterID completer, uint32_t data_value, bool data_has_x, bool is_write_op) {
+    if (completer == CompleterID::NONE)
+        return;
+    if (m_completer_raw_data_samples.find(completer) == m_completer_raw_data_samples.end()) {
+        m_completer_raw_data_samples[completer] = CompleterRawDataSamples();
+    }
+    if (m_completer_bit_activity_map.find(completer) == m_completer_bit_activity_map.end()) {  // 確保條目存在
+        m_completer_bit_activity_map[completer] = CompleterBitActivity();
+    }
+
+    if (is_write_op && !data_has_x) {
+        m_completer_raw_data_samples[completer].pwdata_samples.push_back(data_value);
+    }
+}
+void Statistics::record_out_of_range_access(const OutOfRangeAccessDetail& detail) {
+    m_out_of_range_access_count++;
+    m_out_of_range_details.push_back(detail);
+}
+void Statistics::update_shadow_memory(CompleterID completer, uint32_t paddr, uint32_t pwdata, uint64_t timestamp) {
+    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
+        return;
+
+    m_shadow_memories[completer][paddr] = {pwdata, timestamp};
+
+    m_reverse_write_lookup[pwdata] = {paddr, timestamp};
+}
+
+void Statistics::check_prdata_against_shadow_memory(CompleterID completer, uint32_t paddr, uint32_t prdata, uint64_t timestamp) {
+    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
+        return;
+
+    if (m_shadow_memories[completer].count(paddr)) {
+        uint32_t expected_data = m_shadow_memories[completer][paddr].data;
+        if (prdata != expected_data) {
+            m_data_corruption_count++;
+            m_data_integrity_error_details.push_back({timestamp, paddr, expected_data, prdata, completer, false, 0, 0});
+        }
+    } else {
+        if (m_reverse_write_lookup.count(prdata)) {
+            // 這個數據值之前確實被寫入過，但不是寫到當前地址 paddr
+            const auto& original_write = m_reverse_write_lookup.at(prdata);  // 使用 .at() 獲取 const 引用
+            // 確保原始寫入的地址與當前讀取地址不同
+            if (original_write.address != paddr) {  // <-- 現在這行是正確的
+                // 從未被寫入過的地址，卻讀出了已知數據 -> 數據鏡像 (Data Mirroring)
+                m_mirroring_error_count++;
+                m_data_integrity_error_details.push_back({timestamp, paddr, 0, prdata, completer,  // 預期為0或未定義
+                                                          true, original_write.address, original_write.timestamp});
+            }
+        }
+    }
+}
 void Statistics::record_bus_active_pclk_edge() {
     m_bus_active_pclk_edges++;
 }
+void Statistics::analyze_bus_shorts() {
+    const int BITS_TO_ANALYZE = 8;
 
-void Statistics::record_completer_access(uint32_t paddr) {
-    CompleterID current_completer;
-    if (paddr >= UART_BASE_ADDR && paddr <= UART_END_ADDR) {
-        current_completer = CompleterID::UART;
-    } else if (paddr >= GPIO_BASE_ADDR && paddr <= GPIO_END_ADDR) {
-        current_completer = CompleterID::GPIO;
-    } else if (paddr >= SPI_MASTER_BASE_ADDR && paddr <= SPI_MASTER_END_ADDR) {
-        current_completer = CompleterID::SPI_MASTER;
-    } else {
-        current_completer = CompleterID::UNKNOWN_COMPLETER;
-    }
-    // 1. 更新獨立 Completer 集合
-    m_accessed_completer_ids_set.insert(current_completer);
+    // 使用 C++11 相容的迭代器
+    for (std::map<CompleterID, CompleterRawDataSamples>::const_iterator it = m_completer_raw_data_samples.begin();
+         it != m_completer_raw_data_samples.end(); ++it) {
+        CompleterID comp_id = it->first;
+        const CompleterRawDataSamples& samples_container = it->second;
 
-    if (std::find(m_ordered_accessed_completers.begin(), m_ordered_accessed_completers.end(), current_completer) == m_ordered_accessed_completers.end()) {
-        if (current_completer != CompleterID::UNKNOWN_COMPLETER ||
-            (current_completer == CompleterID::UNKNOWN_COMPLETER && m_completer_transaction_counts[CompleterID::UNKNOWN_COMPLETER] == 0)) {
-            m_ordered_accessed_completers.push_back(current_completer);
+        if (comp_id == CompleterID::UNKNOWN_COMPLETER || comp_id == CompleterID::NONE) {
+            continue;
+        }
+        if (m_completer_bit_activity_map.find(comp_id) == m_completer_bit_activity_map.end()) {
+            continue;
+        }
+        auto& bit_activity = m_completer_bit_activity_map.at(comp_id);
+
+        // --- 分析 PADDR 短路 ---
+        if (samples_container.paddr_samples.size() >= 2) {
+            std::set<uint32_t> unique_samples(samples_container.paddr_samples.begin(), samples_container.paddr_samples.end());
+            if (unique_samples.size() >= 2) {
+                for (int i = 0; i < BITS_TO_ANALYZE; ++i) {
+                    for (int j = i + 1; j < BITS_TO_ANALYZE; ++j) {
+                        if (bit_activity.paddr_bit_details[i].status != BitConnectionStatus::CORRECT ||
+                            bit_activity.paddr_bit_details[j].status != BitConnectionStatus::CORRECT) {
+                            continue;
+                        }
+
+                        bool always_same = true;
+                        for (std::set<uint32_t>::const_iterator sample_it = unique_samples.begin(); sample_it != unique_samples.end(); ++sample_it) {
+                            uint32_t val = *sample_it;
+                            bool val1 = (val >> i) & 0x1;
+                            bool val2 = (val >> j) & 0x1;
+                            if (val1 != val2) {
+                                always_same = false;
+                                break;
+                            }
+                        }
+
+                        if (always_same) {
+                            bit_activity.paddr_bit_details[i].status = BitConnectionStatus::SHORTED;
+                            bit_activity.paddr_bit_details[i].shorted_with_bit_index = j;
+
+                            bit_activity.paddr_bit_details[j].status = BitConnectionStatus::SHORTED;
+                            bit_activity.paddr_bit_details[j].shorted_with_bit_index = i;
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- 分析 PWDATA 短路 ---
+        if (samples_container.pwdata_samples.size() >= 2) {
+            std::set<uint32_t> unique_samples(samples_container.pwdata_samples.begin(), samples_container.pwdata_samples.end());
+            if (unique_samples.size() >= 2) {
+                for (int i = 0; i < BITS_TO_ANALYZE; ++i) {
+                    for (int j = i + 1; j < BITS_TO_ANALYZE; ++j) {
+                        if (bit_activity.pwdata_bit_details[i].status != BitConnectionStatus::CORRECT ||
+                            bit_activity.pwdata_bit_details[j].status != BitConnectionStatus::CORRECT) {
+                            continue;
+                        }
+
+                        bool always_same = true;
+                        for (std::set<uint32_t>::const_iterator sample_it = unique_samples.begin(); sample_it != unique_samples.end(); ++sample_it) {
+                            uint32_t val = *sample_it;
+                            bool val1 = (val >> i) & 0x1;
+                            bool val2 = (val >> j) & 0x1;
+                            if (val1 != val2) {
+                                always_same = false;
+                                break;
+                            }
+                        }
+
+                        if (always_same) {
+                            bit_activity.pwdata_bit_details[i].status = BitConnectionStatus::SHORTED;
+                            bit_activity.pwdata_bit_details[i].shorted_with_bit_index = j;
+
+                            bit_activity.pwdata_bit_details[j].status = BitConnectionStatus::SHORTED;
+                            bit_activity.pwdata_bit_details[j].shorted_with_bit_index = i;
+                        }
+                    }
+                }
+            }
         }
     }
+}
+void Statistics::record_accessed_completer(CompleterID completer_id) {
+    if (completer_id == CompleterID::NONE)
+        return;
 
-    // 3. 更新該 Completer 的交易計數
-    m_completer_transaction_counts[current_completer]++;
+    m_accessed_completer_ids_set.insert(completer_id);
 
-    // 4. 確保 m_completer_bit_activity_map 中有該 completer 的條目
-    if (m_completer_bit_activity_map.find(current_completer) == m_completer_bit_activity_map.end()) {
-        m_completer_bit_activity_map[current_completer] = CompleterBitActivity();
+    if (std::find(m_ordered_accessed_completers.begin(), m_ordered_accessed_completers.end(), completer_id) == m_ordered_accessed_completers.end()) {
+        m_accessed_completer_ids_set.insert(completer_id);
+        m_ordered_accessed_completers.push_back(completer_id);
+    }
+
+    if (m_completer_bit_activity_map.find(completer_id) == m_completer_bit_activity_map.end()) {
+        m_completer_bit_activity_map[completer_id] = CompleterBitActivity();
+    }
+    if (m_completer_raw_data_samples.find(completer_id) == m_completer_raw_data_samples.end()) {
+        m_completer_raw_data_samples[completer_id] = CompleterRawDataSamples();
     }
 }
+
 void Statistics::set_total_pclk_rising_edges(uint64_t total_edges) {
     m_total_simulation_pclk_edges = total_edges;
 }
@@ -175,6 +328,25 @@ const std::map<APBSystem::CompleterID, CompleterBitActivity>& Statistics::get_co
 }
 const std::vector<CompleterID>& Statistics::get_ordered_accessed_completers() const {
     return m_ordered_accessed_completers;
+}
+const std::vector<OutOfRangeAccessDetail>& Statistics::get_out_of_range_details() const {
+    return m_out_of_range_details;
+}
+uint64_t Statistics::get_timeout_error_count() const {
+    return m_timeout_error_count;
+}
+const std::vector<TransactionTimeoutDetail>& Statistics::get_timeout_error_details() const {
+    return m_timeout_error_details;
+}
+
+uint64_t Statistics::get_data_corruption_count() const {
+    return m_data_corruption_count;
+}
+uint64_t Statistics::get_mirroring_error_count() const {
+    return m_mirroring_error_count;
+}
+const std::vector<DataIntegrityErrorDetail>& Statistics::get_data_integrity_error_details() const {
+    return m_data_integrity_error_details;
 }
 
 }  // namespace APBSystem

@@ -99,6 +99,7 @@ int main(int argc, char* argv[]) {
 
     // 6. 呼叫 ApbAnalyzer 的分析結束函式
     apb_analyzer.finalize_analysis(last_processed_vcd_timestamp);
+    statistics.analyze_bus_shorts();
     std::cout << "Info: APB 交易分析完成。" << std::endl;
 
     // 7. 計算並設定 CPU 執行時間
