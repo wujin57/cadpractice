@@ -60,6 +60,14 @@ void Statistics::add_pwdata_sample(CompleterID completer, uint32_t data_value) {
     m_completer_raw_data_samples[completer].pwdata_samples.push_back(data_value);
 }
 
+void Statistics::update_shadow_memory(CompleterID completer, uint32_t paddr, uint32_t pwdata, uint64_t timestamp) {
+    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
+        return;
+
+    m_shadow_memories[completer][paddr] = {pwdata, timestamp};
+    m_reverse_write_lookup[pwdata] = {paddr, timestamp};
+}
+
 void Statistics::add_data_bus_sample(CompleterID completer, uint32_t data_value, bool data_has_x, bool is_write_op) {
     if (completer == CompleterID::NONE)
         return;
@@ -78,14 +86,6 @@ void Statistics::record_out_of_range_access(const OutOfRangeAccessDetail& detail
     m_out_of_range_access_count++;
     m_out_of_range_details.push_back(detail);
 }
-void Statistics::update_shadow_memory(CompleterID completer, uint32_t paddr, uint32_t pwdata, uint64_t timestamp) {
-    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
-        return;
-
-    m_shadow_memories[completer][paddr] = {pwdata, timestamp};
-
-    m_reverse_write_lookup[pwdata] = {paddr, timestamp};
-}
 
 void Statistics::check_prdata_against_shadow_memory(CompleterID completer, uint32_t paddr, uint32_t prdata, uint64_t timestamp) {
     if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
@@ -96,17 +96,46 @@ void Statistics::check_prdata_against_shadow_memory(CompleterID completer, uint3
         if (prdata != expected_data) {
             m_data_corruption_count++;
             m_data_integrity_error_details.push_back({timestamp, paddr, expected_data, prdata, completer, false, 0, 0});
+
+            uint32_t diff = expected_data ^ prdata;
+            if (__builtin_popcount(diff) == 2) {  // 檢查是否多於一個位元為1
+                int first_bit = -1, second_bit = -1;
+                for (int i = 0; i < 8; ++i) {  // 只檢查低8位
+                    if ((diff >> i) & 0x1) {
+                        if (first_bit == -1)
+                            first_bit = i;
+                        else
+                            second_bit = i;
+                    }
+                }
+
+                if (first_bit != -1 && second_bit != -1) {
+                    // 更新 CompleterBitActivity
+                    if (m_completer_bit_activity_map.count(completer)) {
+                        auto& bit_activity = m_completer_bit_activity_map.at(completer);
+                        // 更新數據匯流排的位元狀態 (pwdata_bit_details)
+                        if (bit_activity.pwdata_bit_details[first_bit].status == BitConnectionStatus::CORRECT) {
+                            bit_activity.pwdata_bit_details[first_bit].status = BitConnectionStatus::SHORTED;
+                            bit_activity.pwdata_bit_details[first_bit].shorted_with_bit_index = second_bit;
+                        }
+                        if (bit_activity.pwdata_bit_details[second_bit].status == BitConnectionStatus::CORRECT) {
+                            bit_activity.pwdata_bit_details[second_bit].status = BitConnectionStatus::SHORTED;
+                            bit_activity.pwdata_bit_details[second_bit].shorted_with_bit_index = first_bit;
+                        }
+                    }
+                }
+            }
         }
     } else {
         if (m_reverse_write_lookup.count(prdata)) {
-            // 這個數據值之前確實被寫入過，但不是寫到當前地址 paddr
-            const auto& original_write = m_reverse_write_lookup.at(prdata);  // 使用 .at() 獲取 const 引用
-            // 確保原始寫入的地址與當前讀取地址不同
-            if (original_write.address != paddr) {  // <-- 現在這行是正確的
-                // 從未被寫入過的地址，卻讀出了已知數據 -> 數據鏡像 (Data Mirroring)
-                m_mirroring_error_count++;
-                m_data_integrity_error_details.push_back({timestamp, paddr, 0, prdata, completer,  // 預期為0或未定義
-                                                          true, original_write.address, original_write.timestamp});
+            // --- 情況 2: 該地址之前從未被寫入過 (數據鏡像) ---
+            if (m_reverse_write_lookup.count(prdata)) {
+                const auto& original_write = m_reverse_write_lookup.at(prdata);
+                if (original_write.address != paddr) {
+                    m_mirroring_error_count++;
+                    m_data_integrity_error_details.push_back({timestamp, paddr, 0, prdata, completer,
+                                                              true, original_write.address, original_write.timestamp});
+                }
             }
         }
     }
@@ -159,40 +188,6 @@ void Statistics::analyze_bus_shorts() {
 
                             bit_activity.paddr_bit_details[j].status = BitConnectionStatus::SHORTED;
                             bit_activity.paddr_bit_details[j].shorted_with_bit_index = i;
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- 分析 PWDATA 短路 ---
-        if (samples_container.pwdata_samples.size() >= 2) {
-            std::set<uint32_t> unique_samples(samples_container.pwdata_samples.begin(), samples_container.pwdata_samples.end());
-            if (unique_samples.size() >= 2) {
-                for (int i = 0; i < BITS_TO_ANALYZE; ++i) {
-                    for (int j = i + 1; j < BITS_TO_ANALYZE; ++j) {
-                        if (bit_activity.pwdata_bit_details[i].status != BitConnectionStatus::CORRECT ||
-                            bit_activity.pwdata_bit_details[j].status != BitConnectionStatus::CORRECT) {
-                            continue;
-                        }
-
-                        bool always_same = true;
-                        for (std::set<uint32_t>::const_iterator sample_it = unique_samples.begin(); sample_it != unique_samples.end(); ++sample_it) {
-                            uint32_t val = *sample_it;
-                            bool val1 = (val >> i) & 0x1;
-                            bool val2 = (val >> j) & 0x1;
-                            if (val1 != val2) {
-                                always_same = false;
-                                break;
-                            }
-                        }
-
-                        if (always_same) {
-                            bit_activity.pwdata_bit_details[i].status = BitConnectionStatus::SHORTED;
-                            bit_activity.pwdata_bit_details[i].shorted_with_bit_index = j;
-
-                            bit_activity.pwdata_bit_details[j].status = BitConnectionStatus::SHORTED;
-                            bit_activity.pwdata_bit_details[j].shorted_with_bit_index = i;
                         }
                     }
                 }
