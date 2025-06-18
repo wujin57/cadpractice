@@ -1,9 +1,9 @@
 #include "statistics.hpp"
-#include <algorithm>  // 用於 std::find
-#include <limits>     // 用於處理除以零的情況
+#include <algorithm>
+#include <iostream>
+#include <limits>
 #include <set>
 namespace APBSystem {
-
 Statistics::Statistics()
     : m_read_transactions_no_wait(0),
       m_read_transactions_with_wait(0),
@@ -17,8 +17,14 @@ Statistics::Statistics()
       m_first_valid_pclk_edge_for_stats(0),
       m_out_of_range_access_count(0),
       m_timeout_error_count(0),
+      m_read_write_overlap_count(0),
       m_data_corruption_count(0),
       m_mirroring_error_count(0) {}
+
+void Statistics::set_bus_widths(int paddr_width, int pwdata_width) {
+    m_paddr_width = (paddr_width > 0) ? paddr_width : 32;
+    m_pwdata_width = (pwdata_width > 0) ? pwdata_width : 32;
+}
 
 void Statistics::record_read_transaction(bool had_wait_states, uint64_t duration_pclk_edges) {
     m_total_pclk_edges_for_read_transactions += duration_pclk_edges;
@@ -42,28 +48,19 @@ void Statistics::record_timeout_error(const TransactionTimeoutDetail& detail) {
     m_timeout_error_details.push_back(detail);
 }
 
-void Statistics::add_paddr_sample(CompleterID completer, uint32_t paddr_value) {
-    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
-        return;
-
-    // 確保 Completer 已被記錄
-    record_accessed_completer(completer);
-
-    m_completer_raw_data_samples[completer].paddr_samples.push_back(paddr_value);
-}
-void Statistics::add_pwdata_sample(CompleterID completer, uint32_t data_value) {
-    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
-        return;
-
-    record_accessed_completer(completer);
-
-    m_completer_raw_data_samples[completer].pwdata_samples.push_back(data_value);
+void Statistics::record_read_write_overlap_error(const ReadWriteOverlapDetail& detail) {
+    m_read_write_overlap_count++;
+    m_read_write_overlap_details.push_back(detail);
 }
 
 void Statistics::update_shadow_memory(CompleterID completer, uint32_t paddr, uint32_t pwdata, uint64_t timestamp) {
     if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
         return;
-
+    if (paddr == 0x1a100000) {
+        /* std::cout << "[!!! UART_TARGET_WRITE !!! #" << timestamp << "] "
+                   << "Updating Shadow Memory for PADDR=0x" << std::hex << paddr
+                   << " with PWDATA=0x" << pwdata << std::dec << std::endl;*/
+    }
     m_shadow_memories[completer][paddr] = {pwdata, timestamp};
     m_reverse_write_lookup[pwdata] = {paddr, timestamp};
 }
@@ -71,15 +68,8 @@ void Statistics::update_shadow_memory(CompleterID completer, uint32_t paddr, uin
 void Statistics::add_data_bus_sample(CompleterID completer, uint32_t data_value, bool data_has_x, bool is_write_op) {
     if (completer == CompleterID::NONE)
         return;
-    if (m_completer_raw_data_samples.find(completer) == m_completer_raw_data_samples.end()) {
-        m_completer_raw_data_samples[completer] = CompleterRawDataSamples();
-    }
     if (m_completer_bit_activity_map.find(completer) == m_completer_bit_activity_map.end()) {  // 確保條目存在
         m_completer_bit_activity_map[completer] = CompleterBitActivity();
-    }
-
-    if (is_write_op && !data_has_x) {
-        m_completer_raw_data_samples[completer].pwdata_samples.push_back(data_value);
     }
 }
 void Statistics::record_out_of_range_access(const OutOfRangeAccessDetail& detail) {
@@ -90,18 +80,30 @@ void Statistics::record_out_of_range_access(const OutOfRangeAccessDetail& detail
 void Statistics::check_prdata_against_shadow_memory(CompleterID completer, uint32_t paddr, uint32_t prdata, uint64_t timestamp) {
     if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
         return;
+    static const std::set<uint32_t> externally_driven_regs = {
+        0x1A101008,  // GPIO PADIN (Direct Input Mapping)
+        0x1A100000,  // UART RBR (Buffered Input Data)
+        0x1A100014,
+    };
+
+    if (externally_driven_regs.count(paddr)) {
+        return;
+    }
 
     if (m_shadow_memories[completer].count(paddr)) {
         uint32_t expected_data = m_shadow_memories[completer][paddr].data;
+        /*std::cout << "[DEBUG #" << timestamp << "] "
+                  << " -> Shadow Memory HIT! Expected PRDATA: 0x" << std::hex << expected_data << std::dec << std::endl;*/
         if (prdata != expected_data) {
             m_data_corruption_count++;
             m_data_integrity_error_details.push_back({timestamp, paddr, expected_data, prdata, completer, false, 0, 0});
-
-            uint32_t diff = expected_data ^ prdata;
-            if (__builtin_popcount(diff) == 2) {  // 檢查是否多於一個位元為1
+            /* std::cout << "[DEBUG #" << timestamp << "] "
+                       << " -> Shadow Memory HIT! Expected PRDATA: 0x" << std::hex << expected_data << std::dec << std::endl;*/
+            uint32_t data_diff = expected_data ^ prdata;
+            if (__builtin_popcount(data_diff) == 2) {
                 int first_bit = -1, second_bit = -1;
-                for (int i = 0; i < 8; ++i) {  // 只檢查低8位
-                    if ((diff >> i) & 0x1) {
+                for (int i = 0; i < m_pwdata_width; ++i) {
+                    if ((data_diff >> i) & 0x1) {
                         if (first_bit == -1)
                             first_bit = i;
                         else
@@ -110,10 +112,8 @@ void Statistics::check_prdata_against_shadow_memory(CompleterID completer, uint3
                 }
 
                 if (first_bit != -1 && second_bit != -1) {
-                    // 更新 CompleterBitActivity
                     if (m_completer_bit_activity_map.count(completer)) {
                         auto& bit_activity = m_completer_bit_activity_map.at(completer);
-                        // 更新數據匯流排的位元狀態 (pwdata_bit_details)
                         if (bit_activity.pwdata_bit_details[first_bit].status == BitConnectionStatus::CORRECT) {
                             bit_activity.pwdata_bit_details[first_bit].status = BitConnectionStatus::SHORTED;
                             bit_activity.pwdata_bit_details[first_bit].shorted_with_bit_index = second_bit;
@@ -143,60 +143,9 @@ void Statistics::check_prdata_against_shadow_memory(CompleterID completer, uint3
 void Statistics::record_bus_active_pclk_edge() {
     m_bus_active_pclk_edges++;
 }
-void Statistics::analyze_bus_shorts() {
-    const int BITS_TO_ANALYZE = 8;
 
-    // 使用 C++11 相容的迭代器
-    for (std::map<CompleterID, CompleterRawDataSamples>::const_iterator it = m_completer_raw_data_samples.begin();
-         it != m_completer_raw_data_samples.end(); ++it) {
-        CompleterID comp_id = it->first;
-        const CompleterRawDataSamples& samples_container = it->second;
-
-        if (comp_id == CompleterID::UNKNOWN_COMPLETER || comp_id == CompleterID::NONE) {
-            continue;
-        }
-        if (m_completer_bit_activity_map.find(comp_id) == m_completer_bit_activity_map.end()) {
-            continue;
-        }
-        auto& bit_activity = m_completer_bit_activity_map.at(comp_id);
-
-        // --- 分析 PADDR 短路 ---
-        if (samples_container.paddr_samples.size() >= 2) {
-            std::set<uint32_t> unique_samples(samples_container.paddr_samples.begin(), samples_container.paddr_samples.end());
-            if (unique_samples.size() >= 2) {
-                for (int i = 0; i < BITS_TO_ANALYZE; ++i) {
-                    for (int j = i + 1; j < BITS_TO_ANALYZE; ++j) {
-                        if (bit_activity.paddr_bit_details[i].status != BitConnectionStatus::CORRECT ||
-                            bit_activity.paddr_bit_details[j].status != BitConnectionStatus::CORRECT) {
-                            continue;
-                        }
-
-                        bool always_same = true;
-                        for (std::set<uint32_t>::const_iterator sample_it = unique_samples.begin(); sample_it != unique_samples.end(); ++sample_it) {
-                            uint32_t val = *sample_it;
-                            bool val1 = (val >> i) & 0x1;
-                            bool val2 = (val >> j) & 0x1;
-                            if (val1 != val2) {
-                                always_same = false;
-                                break;
-                            }
-                        }
-
-                        if (always_same) {
-                            bit_activity.paddr_bit_details[i].status = BitConnectionStatus::SHORTED;
-                            bit_activity.paddr_bit_details[i].shorted_with_bit_index = j;
-
-                            bit_activity.paddr_bit_details[j].status = BitConnectionStatus::SHORTED;
-                            bit_activity.paddr_bit_details[j].shorted_with_bit_index = i;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 void Statistics::record_accessed_completer(CompleterID completer_id) {
-    if (completer_id == CompleterID::NONE)
+    if (completer_id == CompleterID::NONE || completer_id == CompleterID::UNKNOWN_COMPLETER)
         return;
 
     m_accessed_completer_ids_set.insert(completer_id);
@@ -207,10 +156,10 @@ void Statistics::record_accessed_completer(CompleterID completer_id) {
     }
 
     if (m_completer_bit_activity_map.find(completer_id) == m_completer_bit_activity_map.end()) {
-        m_completer_bit_activity_map[completer_id] = CompleterBitActivity();
-    }
-    if (m_completer_raw_data_samples.find(completer_id) == m_completer_raw_data_samples.end()) {
-        m_completer_raw_data_samples[completer_id] = CompleterRawDataSamples();
+        CompleterBitActivity activity;
+        activity.paddr_bit_details.resize(m_paddr_width, BitDetailStatus());
+        activity.pwdata_bit_details.resize(m_pwdata_width, BitDetailStatus());
+        m_completer_bit_activity_map[completer_id] = activity;
     }
 }
 
@@ -282,16 +231,9 @@ uint64_t Statistics::get_num_idle_pclk_edges() const {
 
     uint64_t effective_total_edges = 0;
     if (m_first_valid_pclk_edge_for_stats > 0 && m_first_valid_pclk_edge_for_stats <= m_total_simulation_pclk_edges) {
-        // pclk_edge_count 從 1 開始計，所以 first_valid 是第 N 個邊沿
-        // 例如 total=100, first_valid=21, effective = 100-21+1 = 80 (即第21到第100個邊沿)
         effective_total_edges = m_total_simulation_pclk_edges - m_first_valid_pclk_edge_for_stats + 1;
     } else {
-        // 如果 m_first_valid_pclk_edge_for_stats 無效 (例如一直處於復位)
-        // 則有效分析週期為0，Idle也為0
-        // 或者，如果測試案例期望此時 Idle 是 m_total_simulation_pclk_edges - m_bus_active_pclk_edges
-        // (這種情況下 bus_active 會是0，Idle 就是 m_total_simulation_pclk_edges)
-        // 為了匹配，這裡應該返回0，因為沒有有效的分析區間
-        return 0;  // 如果從未脫離復位，則有效Idle週期為0
+        return 0;
     }
 
     if (effective_total_edges < m_bus_active_pclk_edges) {
@@ -333,6 +275,13 @@ uint64_t Statistics::get_timeout_error_count() const {
 const std::vector<TransactionTimeoutDetail>& Statistics::get_timeout_error_details() const {
     return m_timeout_error_details;
 }
+uint64_t Statistics::get_read_write_overlap_count() const {
+    return m_read_write_overlap_count;
+}
+
+const std::vector<ReadWriteOverlapDetail>& Statistics::get_read_write_overlap_details() const {
+    return m_read_write_overlap_details;
+}
 
 uint64_t Statistics::get_data_corruption_count() const {
     return m_data_corruption_count;
@@ -340,8 +289,11 @@ uint64_t Statistics::get_data_corruption_count() const {
 uint64_t Statistics::get_mirroring_error_count() const {
     return m_mirroring_error_count;
 }
+
 const std::vector<DataIntegrityErrorDetail>& Statistics::get_data_integrity_error_details() const {
     return m_data_integrity_error_details;
 }
-
+uint64_t Statistics::get_out_of_range_access_count() const {
+    return m_out_of_range_access_count;
+}
 }  // namespace APBSystem

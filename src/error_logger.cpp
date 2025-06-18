@@ -1,31 +1,33 @@
-#pragma once
-#include <algorithm>
+#include "error_logger.hpp"
+#include <iomanip>
 #include <sstream>
-#include <string>
-#include <vector>
 
-struct ErrorInfo {
-    int timestamp;
-    std::string message;
+void ErrorLogger::logAddressMirroringError(uint64_t time, uint32_t original_address) {
+    std::stringstream ss;
+    ss << "[#" << time << "] Address Mirroring Error at 0x"
+       << std::hex << std::setw(8) << std::setfill('0') << original_address;
+    errors_.push_back(ss.str());
+}
 
-    bool operator<(const ErrorInfo& other) const {
-        if (timestamp != other.timestamp) {
-            return timestamp < other.timestamp;
-        }
-        // Optional: secondary sort by message if timestamps are equal
-        return message < other.message;
-    }
-};
+void ErrorLogger::logDataCorruptionError(uint64_t time, uint32_t address, uint32_t original_data) {
+    std::stringstream ss;
+    ss << "[#" << time << "] Data Corruption Error at 0x"
+       << std::hex << std::setw(8) << std::setfill('0') << address
+       << ", Original Data: 0x" << std::hex << std::setw(8) << std::setfill('0') << original_data;
+    errors_.push_back(ss.str());
+}
 
-class ErrorLogger {
-   public:
-    void log_error(int timestamp, const std::string& formatted_message);
+/**
+ * @brief 【新增】實作交易超時錯誤的記錄邏輯。
+ * 根據Q&A文件，格式化輸出超時錯誤訊息。
+ */
+void ErrorLogger::logTransactionTimeoutError(uint64_t time, uint32_t address) {
+    std::stringstream ss;
+    ss << "[#" << time << "] Timeout Occurred Transaction Stalled at PADDR 0x"
+       << std::hex << std::setw(8) << std::setfill('0') << address;
+    errors_.push_back(ss.str());
+}
 
-    // Call this before getting errors if they might not be sorted
-    void sort_errors();
-    const std::vector<ErrorInfo>& get_errors() const;
-
-   private:
-    std::vector<ErrorInfo> errors_;
-    bool sorted_ = false;
-};
+const std::vector<std::string>& ErrorLogger::getErrors() const {
+    return errors_;
+}

@@ -29,6 +29,8 @@ class ApbAnalyzer {
     ApbFsmState m_current_apb_fsm_state;
     TransactionInfo m_current_transaction;  // 追蹤當前正在進行的交易
     uint64_t m_current_pclk_edge_count;     // 內部追蹤當前分析到的 PCLK 上升沿編號
+
+    std::map<uint32_t, uint64_t> m_pending_writes;
     void process_transaction_completion(const SignalState& snapshot_at_completion);
     void check_errors_and_log_samples(const SignalState& snapshot_at_completion);
     bool check_for_timeout(const SignalState& current_snapshot);

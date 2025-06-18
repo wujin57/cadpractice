@@ -30,7 +30,7 @@ const uint32_t SPI_MASTER_END_ADDR = 0x1A102FFF;
 struct TransactionInfo {
     bool active = false;
     uint64_t start_pclk_edge_count = 0;
-    uint64_t transaction_start_time_ps = 0;  // 交易開始的 VCD 時間戳 (PSEL拉高時)
+    uint64_t transaction_start_time_ps = 0;
     bool is_write = false;
     uint32_t paddr = 0;
     bool paddr_val_has_x = false;
@@ -126,32 +126,17 @@ struct BitDetailStatus {
 };
 
 struct CompleterBitActivity {
-    std::vector<BitDetailStatus> paddr_bit_details;   // 固定8位
-    std::vector<BitDetailStatus> pwdata_bit_details;  // 固定8位
+    std::vector<BitDetailStatus> paddr_bit_details;
+    std::vector<BitDetailStatus> pwdata_bit_details;
 
-    CompleterBitActivity()
-        : paddr_bit_details(8),  // 預設建構 BitDetailStatus (status=CORRECT, shorted_with_bit=-1)
-          pwdata_bit_details(8) {}
+    CompleterBitActivity() = default;
 };
 struct OutOfRangeAccessDetail {
     uint64_t timestamp_ps;
     uint32_t paddr;
     CompleterID target_completer;
     bool is_write_transaction;
-    bool prdata_had_x_on_oor_read;  // 仍然記錄 OOR 時 PRDATA 是否有 'x'
-};
-
-// 用於儲存原始 PADDR 和 PWDATA 值的樣本，以供短路分析
-struct CompleterRawDataSamples {
-    std::vector<uint32_t> paddr_samples;   // 只儲存不含 'x' 的 PADDR 值
-    std::vector<uint32_t> pwdata_samples;  // 只儲存不含 'x' 的 PWDATA 值 (僅寫交易)
-};
-
-struct TransactionTimeoutDetail {
-    uint64_t start_timestamp_ps;
-    uint64_t timeout_timestamp_ps;
-    uint32_t paddr;
-    uint64_t exceeded_cycles;
+    bool prdata_had_x_on_oor_read;
 };
 
 struct DataIntegrityErrorDetail {
@@ -169,5 +154,17 @@ struct DataIntegrityErrorDetail {
 struct ReverseWriteInfo {
     uint32_t address;
     uint64_t timestamp;
+};
+
+struct TransactionTimeoutDetail {
+    uint64_t start_timestamp_ps;
+    uint64_t timeout_timestamp_ps;
+    uint32_t paddr;
+    uint64_t exceeded_cycles;
+};
+
+struct ReadWriteOverlapDetail {
+    uint64_t timestamp_ps;
+    uint32_t paddr;
 };
 }  // namespace APBSystem
