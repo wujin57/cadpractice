@@ -153,30 +153,6 @@ src/apb_analyzer.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/APB_Recognizer.dir/build.make CMakeFiles/APB_Recognizer.dir/src/apb_analyzer.cpp.s
 .PHONY : src/apb_analyzer.cpp.s
 
-src/error_logger.o: src/error_logger.cpp.o
-.PHONY : src/error_logger.o
-
-# target to build an object file
-src/error_logger.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/APB_Recognizer.dir/build.make CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o
-.PHONY : src/error_logger.cpp.o
-
-src/error_logger.i: src/error_logger.cpp.i
-.PHONY : src/error_logger.i
-
-# target to preprocess a source file
-src/error_logger.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/APB_Recognizer.dir/build.make CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.i
-.PHONY : src/error_logger.cpp.i
-
-src/error_logger.s: src/error_logger.cpp.s
-.PHONY : src/error_logger.s
-
-# target to generate assembly for a file
-src/error_logger.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/APB_Recognizer.dir/build.make CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.s
-.PHONY : src/error_logger.cpp.s
-
 src/main.o: src/main.cpp.o
 .PHONY : src/main.o
 
@@ -309,9 +285,6 @@ help:
 	@echo "... src/apb_analyzer.o"
 	@echo "... src/apb_analyzer.i"
 	@echo "... src/apb_analyzer.s"
-	@echo "... src/error_logger.o"
-	@echo "... src/error_logger.i"
-	@echo "... src/error_logger.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"

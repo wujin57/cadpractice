@@ -111,24 +111,10 @@ CMakeFiles/APB_Recognizer.dir/src/apb_analyzer.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/APB_Recognizer.dir/src/apb_analyzer.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ICCAD/src/apb_analyzer.cpp -o CMakeFiles/APB_Recognizer.dir/src/apb_analyzer.cpp.s
 
-CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o: CMakeFiles/APB_Recognizer.dir/flags.make
-CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o: ../src/error_logger.cpp
-CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o: CMakeFiles/APB_Recognizer.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ICCAD/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o -MF CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o.d -o CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o -c /home/ICCAD/src/error_logger.cpp
-
-CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/ICCAD/src/error_logger.cpp > CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.i
-
-CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/ICCAD/src/error_logger.cpp -o CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.s
-
 CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o: CMakeFiles/APB_Recognizer.dir/flags.make
 CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o: ../src/report_generator.cpp
 CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o: CMakeFiles/APB_Recognizer.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ICCAD/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ICCAD/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o -MF CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o.d -o CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o -c /home/ICCAD/src/report_generator.cpp
 
 CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.i: cmake_force
@@ -142,7 +128,7 @@ CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.s: cmake_force
 CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: CMakeFiles/APB_Recognizer.dir/flags.make
 CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: ../src/signal_manager.cpp
 CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: CMakeFiles/APB_Recognizer.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ICCAD/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ICCAD/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o -MF CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o.d -o CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o -c /home/ICCAD/src/signal_manager.cpp
 
 CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.i: cmake_force
@@ -156,7 +142,7 @@ CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.s: cmake_force
 CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o: CMakeFiles/APB_Recognizer.dir/flags.make
 CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o: ../src/statistics.cpp
 CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o: CMakeFiles/APB_Recognizer.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ICCAD/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/ICCAD/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o -MF CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o.d -o CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o -c /home/ICCAD/src/statistics.cpp
 
 CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.i: cmake_force
@@ -172,7 +158,6 @@ APB_Recognizer_OBJECTS = \
 "CMakeFiles/APB_Recognizer.dir/src/main.cpp.o" \
 "CMakeFiles/APB_Recognizer.dir/src/vcd_parser.cpp.o" \
 "CMakeFiles/APB_Recognizer.dir/src/apb_analyzer.cpp.o" \
-"CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o" \
 "CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o" \
 "CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o" \
 "CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o"
@@ -183,13 +168,12 @@ APB_Recognizer_EXTERNAL_OBJECTS =
 APB_Recognizer: CMakeFiles/APB_Recognizer.dir/src/main.cpp.o
 APB_Recognizer: CMakeFiles/APB_Recognizer.dir/src/vcd_parser.cpp.o
 APB_Recognizer: CMakeFiles/APB_Recognizer.dir/src/apb_analyzer.cpp.o
-APB_Recognizer: CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o
 APB_Recognizer: CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o
 APB_Recognizer: CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o
 APB_Recognizer: CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o
 APB_Recognizer: CMakeFiles/APB_Recognizer.dir/build.make
 APB_Recognizer: CMakeFiles/APB_Recognizer.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/ICCAD/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX executable APB_Recognizer"
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/ICCAD/build/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX executable APB_Recognizer"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/APB_Recognizer.dir/link.txt --verbose=$(VERBOSE)
 
 # Rule to build all files generated by this target.

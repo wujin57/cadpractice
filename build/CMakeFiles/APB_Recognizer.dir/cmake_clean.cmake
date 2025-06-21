@@ -3,8 +3,6 @@ file(REMOVE_RECURSE
   "APB_Recognizer.pdb"
   "CMakeFiles/APB_Recognizer.dir/src/apb_analyzer.cpp.o"
   "CMakeFiles/APB_Recognizer.dir/src/apb_analyzer.cpp.o.d"
-  "CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o"
-  "CMakeFiles/APB_Recognizer.dir/src/error_logger.cpp.o.d"
   "CMakeFiles/APB_Recognizer.dir/src/main.cpp.o"
   "CMakeFiles/APB_Recognizer.dir/src/main.cpp.o.d"
   "CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o"

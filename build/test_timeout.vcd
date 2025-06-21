@@ -1,0 +1,65 @@
+$date
+    June 20, 2025
+$end
+$version
+    Timeout Test
+$end
+$timescale
+    1ps
+$end
+$scope module test $end
+$scope module apb_if $end
+$var wire 1 # clk $end
+$var wire 1 $ rst_n $end
+$var reg 32 % paddr [31:0] $end
+$var reg 1 ' pwrite $end
+$var reg 1 ( psel $end
+$var reg 1 ) penable $end
+$var reg 1 * pready $end
+$upscope $end
+$upscope $end
+$enddefinitions $end
+$dumpvars
+b0 #
+b0 $
+b0 %
+x'
+x(
+x)
+x*
+$end
+
+#0
+1$
+
+// Transaction starts
+#100000
+1(
+b0001101000010000001000000011000 %
+0'
+#105000
+1#
+#110000
+0#
+1)
+
+// PENABLE goes high after 1 cycle
+#115000
+1#
+#120000
+0#
+
+// --- PREADY remains low for more than 100 cycles ---
+// 100 cycles * 10000ps/cycle = 1,000,000 ps
+// We wait until #120000 + 1,010,000 = #1130000
+
+#1130000
+1* // PREADY finally goes high
+#1135000
+1#
+#1140000
+0#
+0(
+0)
+0*
+
