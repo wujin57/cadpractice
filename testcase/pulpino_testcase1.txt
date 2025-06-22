@@ -7,7 +7,7 @@
 7. Bus Utilization (%):                             24.85 %
 8. Number of Idle PCLK edges:                       3654
 9. Number of Unique Completers Accessed:            1
-10. CPU Elapsed Time for Analysis (ms):             15.00 ms
+10. CPU Elapsed Time for Analysis (ms):             16.70 ms
 
 Number of Transactions with Timeout: 0
 Number of Out-of-Range Accesses: 0

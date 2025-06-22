@@ -1,0 +1,34 @@
+$timescale 1 ps $end
+$scope module test $end
+$var wire 1 ! clk $end
+$var wire 1 " psel $end
+$var wire 1 # penable $end
+$var wire 1 $ pready $end
+$var wire 32 % paddr $end
+$var wire 1 + pwrite $end
+$enddefinitions $end
+$dumpvars
+0!
+0"
+0#
+0$
+b0 %
+0+
+$end
+#5000
+1!
+1"
+// 黃金參考: 應寫入位址 0x24 (b...00100100)
+// 實際波形: PADDR 顯示為 0x30 (b...00110000)
+// 這是因為位元 a5 和 a4 發生了短路互換
+b0000000000000000000000000110000 %  // PADDR = 0x30
+1+
+#10000
+0!
+#15000
+1!
+1#
+#25000
+1!
+1$
+

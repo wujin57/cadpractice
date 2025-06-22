@@ -1,0 +1,15 @@
+Number of Read Transactions with no wait states: 0
+Number of Read Transactions with wait states: 0
+Number of Write Transactions with no wait states: 0
+Number of Write Transactions with wait states: 0
+Average Read Cycle: 0.00 cycles
+Average Write Cycle: 0.00 cycles
+Bus Utilization: 0.00%
+Number of Idle PCLK edges: 0
+Number of Completer: 0
+CPU Elapsed Time: 0.08 ms
+
+Number of Transactions with Timeout: 0
+Number of Out-of-Range Accesses: 0
+Number of Mirrored Transactions: 0
+Number of Read-Write Overlap Errors: 0

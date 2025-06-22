@@ -1,16 +1,16 @@
-Number of Read Transactions with no wait states: 500
-Number of Read Transactions with wait states: 0
-Number of Write Transactions with no wait states: 560
-Number of Write Transactions with wait states: 0
-Average Read Cycle: 2.00 cycles
-Average Write Cycle: 2.00 cycles
-Bus Utilization: 8.43%
-Number of Idle PCLK edges: 23017
+Number of Read Transactions with no wait states: 0
+Number of Read Transactions with wait states: 3
+Number of Write Transactions with no wait states: 0
+Number of Write Transactions with wait states: 2
+Average Read Cycle: 3.00 cycles
+Average Write Cycle: 3.00 cycles
+Bus Utilization: 85.71%
+Number of Idle PCLK edges: 3
 Number of Completer: 2
-CPU Elapsed Time: 19.46 ms
+CPU Elapsed Time: 0.13 ms
 
 Number of Transactions with Timeout: 0
-Number of Out-of-Range Accesses: 0
+Number of Out-of-Range Accesses: 2
 Number of Mirrored Transactions: 0
 Number of Read-Write Overlap Errors: 0
 
@@ -81,6 +81,9 @@ d3: Correct
 d2: Correct
 d1: Correct
 d0: Correct
+[#225000] Out-of-Range Access -> PADDR 0xbaddffff (Requester 1 -> Completer UNKNOWN)
+[#365000] Data Corruption -> Expected PRDATA: 0xaaaaaaaa, Received: 0xaaaa5555
+[#425000] Out-of-Range Access -> PADDR 0xd080008 (Requester 1 -> Completer UNKNOWN)
 
 Completer 2 PADDR Connections
 a31: Correct
@@ -149,3 +152,6 @@ d3: Correct
 d2: Correct
 d1: Correct
 d0: Correct
+[#225000] Out-of-Range Access -> PADDR 0xbaddffff (Requester 1 -> Completer UNKNOWN)
+[#365000] Data Corruption -> Expected PRDATA: 0xaaaaaaaa, Received: 0xaaaa5555
+[#425000] Out-of-Range Access -> PADDR 0xd080008 (Requester 1 -> Completer UNKNOWN)

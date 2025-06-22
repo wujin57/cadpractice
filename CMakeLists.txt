@@ -13,8 +13,6 @@ set(SOURCES
     src/apb_analyzer.cpp
     src/apb_analyzer.hpp
     src/apb_types.hpp
-    src/error_logger.cpp
-    src/error_logger.hpp
     src/report_generator.cpp
     src/report_generator.hpp
     src/signal_manager.cpp

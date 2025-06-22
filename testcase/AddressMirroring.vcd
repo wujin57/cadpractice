@@ -1,0 +1,59 @@
+$timescale 1 ps $end
+$scope module test $end
+$var wire 1 ! clk $end
+$var wire 1 " psel $end
+$var wire 1 # penable $end
+$var wire 1 $ pready $end
+$var wire 32 % paddr $end
+$var wire 32 & pwdata $end
+$var wire 32 * prdata $end
+$var wire 1 + pwrite $end
+$enddefinitions $end
+$dumpvars
+0!
+0"
+0#
+0$
+b0 %
+b0 &
+b0 *
+0+
+$end
+// --- 階段一：對 addr_A (0x10) 寫入 data_X (0xCAFEBABE) ---
+#5000
+1!
+1"
+b0000000000000000000000000010000 %  // PADDR = 0x10
+b11001010111111101011101010111110 &  // PWDATA = 0xCAFEBABE
+1+
+#10000
+0!
+#15000
+1!
+1#
+#25000
+1!
+1$
+#35000
+1!
+0"
+0#
+0$
+// --- 若干時間後 ---
+// --- 階段二：讀取從未被寫入的 addr_B (0x50) ---
+#505000
+1!
+1"
+b0000000000000000000000001010000 %  // PADDR = 0x50
+0+
+#510000
+0!
+#515000
+1!
+1#
+// 讀取到了之前寫入 0x10 的資料！
+b11001010111111101011101010111110 * // PRDATA = 0xCAFEBABE
+#525000
+1!
+1$
+

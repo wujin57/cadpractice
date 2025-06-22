@@ -102,68 +102,68 @@ void ReportGenerator::generate_apb_transaction_report(const Statistics& stats, s
             }
         }
         completer_display_index++;
+    }
 
-        struct GernericError {
-            uint64_t timestamp;
-            std::string message;
-            bool operator<(const GernericError& other) const {
-                return timestamp < other.timestamp;
-            }
-        };
-        std::vector<GernericError> all_errors;
+    struct GernericError {
+        uint64_t timestamp;
+        std::string message;
+        bool operator<(const GernericError& other) const {
+            return timestamp < other.timestamp;
+        }
+    };
+    std::vector<GernericError> all_errors;
 
-        const auto& oor_details = stats.get_out_of_range_details();
-        for (const auto& detail : oor_details) {
-            std::ostringstream oss;
-            oss << "Out-of-Range Access -> PADDR 0x"
-                << std::hex << detail.paddr << std::dec
-                << " (Requester 1 -> Completer " << completer_id_to_report_string(detail.target_completer)
-                << ")";
+    const auto& oor_details = stats.get_out_of_range_details();
+    for (const auto& detail : oor_details) {
+        std::ostringstream oss;
+        oss << "Out-of-Range Access -> PADDR 0x"
+            << std::hex << detail.paddr << std::dec
+            << " (Requester 1 -> Completer " << completer_id_to_report_string(detail.target_completer)
+            << ")";
+        all_errors.push_back({detail.timestamp_ps, oss.str()});
+    }
+
+    const auto& timeout_details = stats.get_timeout_error_details();
+    for (const auto& detail : timeout_details) {
+        std::ostringstream oss;
+        oss << "Timeout Occurred -> Transaction Stalled at PADDR 0x"
+            << std::hex << detail.paddr << std::dec;
+        all_errors.push_back({detail.timeout_timestamp_ps, oss.str()});
+    }
+
+    const auto& overlap_details = stats.get_read_write_overlap_details();
+    for (const auto& detail : overlap_details) {
+        std::ostringstream oss;
+        oss << "Read-Write Overlap Error -> Read & Write at PADDR 0x"
+            << std::hex << detail.paddr << std::dec << " overlapped";
+        all_errors.push_back({detail.timestamp_ps, oss.str()});
+    }
+    const auto& integrity_errors = stats.get_data_integrity_error_details();
+    for (const auto& detail : integrity_errors) {
+        std::ostringstream oss;
+        if (detail.is_mirroring_suspected) {
+            oss << "Data Mirroring -> Value 0x" << std::hex << detail.received_data
+                << " written at PADDR 0x" << detail.original_write_addr
+                << " also found at PADDR 0x" << detail.paddr << std::dec;
+            all_errors.push_back({detail.timestamp_ps, oss.str()});
+
+            std::ostringstream oss_addr;
+            oss_addr << "Address Mirroring -> Write at PADDR 0x" << std::hex << detail.original_write_addr
+                     << " also reflected at PADDR 0x" << detail.paddr << std::dec;
+            all_errors.push_back({detail.original_write_time, oss_addr.str()});
+
+        } else {
+            oss << "Data Corruption -> Expected PRDATA: 0x" << std::hex << detail.expected_data
+                << ", Received: 0x" << detail.received_data << std::dec;
             all_errors.push_back({detail.timestamp_ps, oss.str()});
         }
+    }
 
-        const auto& timeout_details = stats.get_timeout_error_details();
-        for (const auto& detail : timeout_details) {
-            std::ostringstream oss;
-            oss << "Timeout Occurred -> Transaction Stalled at PADDR 0x"
-                << std::hex << detail.paddr << std::dec;
-            all_errors.push_back({detail.timeout_timestamp_ps, oss.str()});
-        }
-
-        const auto& overlap_details = stats.get_read_write_overlap_details();
-        for (const auto& detail : overlap_details) {
-            std::ostringstream oss;
-            oss << "Read-Write Overlap Error -> Read & Write at PADDR 0x"
-                << std::hex << detail.paddr << std::dec << " overlapped";
-            all_errors.push_back({detail.timestamp_ps, oss.str()});
-        }
-        const auto& integrity_errors = stats.get_data_integrity_error_details();
-        for (const auto& detail : integrity_errors) {
-            std::ostringstream oss;
-            if (detail.is_mirroring_suspected) {
-                oss << "Data Mirroring -> Value 0x" << std::hex << detail.received_data
-                    << " written at PADDR 0x" << detail.original_write_addr
-                    << " also found at PADDR 0x" << detail.paddr << std::dec;
-                all_errors.push_back({detail.timestamp_ps, oss.str()});
-
-                std::ostringstream oss_addr;
-                oss_addr << "Address Mirroring -> Write at PADDR 0x" << std::hex << detail.original_write_addr
-                         << " also reflected at PADDR 0x" << detail.paddr << std::dec;
-                all_errors.push_back({detail.original_write_time, oss_addr.str()});
-
-            } else {
-                oss << "Data Corruption -> Expected PRDATA: 0x" << std::hex << detail.expected_data
-                    << ", Received: 0x" << detail.received_data << std::dec;
-                all_errors.push_back({detail.timestamp_ps, oss.str()});
-            }
-        }
-
-        std::sort(all_errors.begin(), all_errors.end());
-        if (!all_errors.empty()) {
-            out_stream << "\n--- Detected Errors (Sorted by Time) ---\n";
-            for (const auto& error : all_errors) {
-                out_stream << "[#" << error.timestamp << "] " << error.message << "\n";
-            }
+    std::sort(all_errors.begin(), all_errors.end());
+    if (!all_errors.empty()) {
+        out_stream << "\n--- Detected Errors (Sorted by Time) ---\n";
+        for (const auto& error : all_errors) {
+            out_stream << "[#" << error.timestamp << "] " << error.message << "\n";
         }
     }
 }

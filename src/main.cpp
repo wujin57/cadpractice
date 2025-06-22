@@ -5,7 +5,6 @@
 #include <vector>
 #include "apb_analyzer.hpp"
 #include "apb_types.hpp"
-#include "error_logger.hpp"
 #include "report_generator.hpp"
 #include "signal_manager.hpp"
 #include "statistics.hpp"
@@ -21,8 +20,7 @@ int main(int argc, char* argv[]) {
     VcdParser vcd_parser;
     SignalManager signal_manager;
     Statistics statistics;
-    ErrorLogger error_logger;
-    ApbAnalyzer apb_analyzer(statistics, error_logger);
+    ApbAnalyzer apb_analyzer(statistics);
     ReportGenerator report_generator;
 
     SignalState current_signal_snapshot;
