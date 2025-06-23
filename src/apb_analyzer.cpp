@@ -1,8 +1,6 @@
 // apb_analyzer.cpp
 #include "apb_analyzer.hpp"
 #include <iostream>
-#include <map>
-#include <vector>
 
 namespace APBSystem {
 
@@ -33,18 +31,16 @@ void ApbAnalyzer::analyze_on_pclk_rising_edge(const SignalState& current_snapsho
         m_transaction_cycle_counter++;
     }
 
-    // 使用與 FSM 耦合的 Timeout 檢查 (此版本保留)
     if (check_for_timeout(current_snapshot)) {
         return;
     }
-
     if (current_snapshot.psel && !current_snapshot.psel_has_x) {
         m_statistics.record_bus_active_pclk_edge();
     }
 
-    ApbFsmState state_before_handling = m_current_apb_fsm_state;
+    ApbFsmState state_before = m_current_apb_fsm_state;
 
-    switch (state_before_handling) {
+    switch (state_before) {
         case ApbFsmState::IDLE:
             handle_idle_state(current_snapshot);
             break;
@@ -56,60 +52,56 @@ void ApbAnalyzer::analyze_on_pclk_rising_edge(const SignalState& current_snapsho
             break;
     }
 
-    // --- 【修正 1: 加入 FSM 重置後的即時處理邏輯】---
-    // 如果 FSM 是從 SETUP 或 ACCESS 被強制返回 IDLE (例如因為交易中止或重疊)
-    // 我們必須在同一個時脈週期內，立即重新執行 IDLE 狀態的處理邏輯，
-    // 這樣才能捕捉到那個剛剛開始的、造成重疊的新交易。
-    if ((state_before_handling == ApbFsmState::SETUP || state_before_handling == ApbFsmState::ACCESS) && m_current_apb_fsm_state == ApbFsmState::IDLE) {
+    if ((state_before == ApbFsmState::SETUP || state_before == ApbFsmState::ACCESS) &&
+        m_current_apb_fsm_state == ApbFsmState::IDLE) {
         handle_idle_state(current_snapshot);
     }
 
-    // 無等待狀態的轉換
-    if (state_before_handling == ApbFsmState::SETUP && m_current_apb_fsm_state == ApbFsmState::ACCESS) {
+    if (state_before == ApbFsmState::SETUP && m_current_apb_fsm_state == ApbFsmState::ACCESS) {
         handle_access_state(current_snapshot);
     }
 }
 
 void ApbAnalyzer::handle_idle_state(const SignalState& snapshot) {
-    if (snapshot.psel && !snapshot.psel_has_x && !snapshot.penable) {
-        bool is_write = snapshot.pwrite && !snapshot.pwrite_has_x;
-        uint32_t paddr = snapshot.paddr;
+    if (!snapshot.psel || snapshot.psel_has_x || snapshot.penable) {
+        return;
+    }
 
-        if (!is_write) {
-            // Overlap 檢查邏輯：檢查這個位址是否在「待處理寫入」的清單中
-            if (m_pending_writes.count(paddr)) {
-                // 在判斷 Overlap 前，應先確認 pending 的寫入是否已超時
-                const auto& write_info = m_pending_writes.at(paddr);
-                uint64_t pending_duration = m_current_pclk_edge_count - write_info.start_pclk_edge_count;
-                if (pending_duration <= 100) {
-                    m_statistics.record_read_write_overlap_error({snapshot.timestamp_ps, paddr});
-                }
-            }
-        } else {
-            if (m_pending_writes.find(paddr) == m_pending_writes.end()) {
-                m_pending_writes[paddr] = {snapshot.timestamp_ps, m_current_pclk_edge_count};
+    bool is_write = snapshot.pwrite && !snapshot.pwrite_has_x;
+    uint32_t paddr = snapshot.paddr;
+
+    if (!is_write) {
+        auto it = m_pending_writes.find(paddr);
+        if (it != m_pending_writes.end()) {
+            uint64_t pend_cycles = m_current_pclk_edge_count - it->second.start_pclk_edge_count;
+            if (pend_cycles <= 100) {
+                m_statistics.record_read_write_overlap_error({snapshot.timestamp_ps, paddr});
             }
         }
+    } else {
+        if (m_pending_writes.find(paddr) == m_pending_writes.end()) {
+            m_pending_writes[paddr] = {snapshot.timestamp_ps, m_current_pclk_edge_count};
+        }
+    }
 
-        m_current_apb_fsm_state = ApbFsmState::SETUP;
-        m_current_transaction.active = true;
-        m_current_transaction.start_pclk_edge_count = m_current_pclk_edge_count;
-        m_transaction_cycle_counter = 1;
-        m_current_transaction.transaction_start_time_ps = snapshot.timestamp_ps;
-        m_current_transaction.is_write = is_write;
-        m_current_transaction.paddr = paddr;
-        m_current_transaction.paddr_val_has_x = snapshot.paddr_has_x;
-        if (m_current_transaction.is_write) {
-            m_current_transaction.pwdata_val = snapshot.pwdata;
-            m_current_transaction.pwdata_val_has_x = snapshot.pwdata_has_x;
-        }
-        m_current_transaction.had_wait_state = false;
-        m_current_transaction.is_out_of_range = false;
-        if (!snapshot.paddr_has_x) {
-            m_current_transaction.target_completer = get_completer_id_from_paddr(snapshot.paddr);
-        } else {
-            m_current_transaction.target_completer = CompleterID::UNKNOWN_COMPLETER;
-        }
+    m_current_apb_fsm_state = ApbFsmState::SETUP;
+    m_current_transaction.active = true;
+    m_current_transaction.start_pclk_edge_count = m_current_pclk_edge_count;
+    m_transaction_cycle_counter = 1;
+    m_current_transaction.transaction_start_time_ps = snapshot.timestamp_ps;
+    m_current_transaction.is_write = is_write;
+    m_current_transaction.paddr = paddr;
+    m_current_transaction.paddr_val_has_x = snapshot.paddr_has_x;
+    if (m_current_transaction.is_write) {
+        m_current_transaction.pwdata_val = snapshot.pwdata;
+        m_current_transaction.pwdata_val_has_x = snapshot.pwdata_has_x;
+    }
+    m_current_transaction.had_wait_state = false;
+    m_current_transaction.is_out_of_range = false;
+    if (!snapshot.paddr_has_x) {
+        m_current_transaction.target_completer = get_completer_id_from_paddr(snapshot.paddr);
+    } else {
+        m_current_transaction.target_completer = CompleterID::UNKNOWN_COMPLETER;
     }
 }
 
@@ -128,7 +120,6 @@ void ApbAnalyzer::handle_setup_state(const SignalState& snapshot) {
     }
 }
 
-// --- 【修正 2: 強化 handle_access_state 的中斷處理邏輯】---
 void ApbAnalyzer::handle_access_state(const SignalState& snapshot) {
     if (!m_current_transaction.active) {
         m_current_apb_fsm_state = ApbFsmState::IDLE;
@@ -160,7 +151,6 @@ void ApbAnalyzer::handle_access_state(const SignalState& snapshot) {
     m_current_transaction.had_wait_state = true;
 }
 
-// ... (其餘函式 process_transaction_completion, check_for_timeout 等保持不變) ...
 bool ApbAnalyzer::check_for_timeout(const SignalState& current_snapshot) {
     if (!m_current_transaction.active) {
         return false;

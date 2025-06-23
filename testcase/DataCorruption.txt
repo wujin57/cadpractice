@@ -4,10 +4,10 @@
 4. Number of Write Transactions with wait states:   0
 5. Average Read Cycle Duration (PCLK edges):        0.00
 6. Average Write Cycle Duration (PCLK edges):       0.00
-7. Bus Utilization (%):                             50.00 %
-8. Number of Idle PCLK edges:                       2
+7. Bus Utilization (%):                             0.00 %
+8. Number of Idle PCLK edges:                       0
 9. Number of Unique Completers Accessed:            0
-10. CPU Elapsed Time for Analysis (ms):             7.83 ms
+10. CPU Elapsed Time for Analysis (ms):             8.31 ms
 
 Number of Transactions with Timeout: 0
 Number of Out-of-Range Accesses: 0

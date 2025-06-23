@@ -2,9 +2,9 @@
 #pragma once
 
 #include <map>
+#include <unordered_map>
 #include "apb_types.hpp"
 #include "statistics.hpp"
-
 namespace APBSystem {
 
 // 這個結構體用於追蹤待處理寫入的生命週期
@@ -25,8 +25,7 @@ class ApbAnalyzer {
     ApbFsmState m_current_apb_fsm_state;
     TransactionInfo m_current_transaction;
 
-    // 這個 map 是偵測 Overlap 的基礎
-    std::map<uint32_t, PendingWriteInfo> m_pending_writes;
+    std::unordered_map<uint32_t, PendingWriteInfo> m_pending_writes;
 
     uint64_t m_current_pclk_edge_count;
     uint64_t m_transaction_cycle_counter;
@@ -43,5 +42,4 @@ class ApbAnalyzer {
     CompleterID get_completer_id_from_paddr(uint32_t paddr) const;
     void check_for_out_of_range(const SignalState& snapshot_at_completion);
 };
-
 }  // namespace APBSystem
