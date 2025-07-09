@@ -1,0 +1,1 @@
+/usr/bin/c++ -static -rdynamic CMakeFiles/APB_Recongnizer.dir/src/main.cpp.o CMakeFiles/APB_Recongnizer.dir/src/vcd_parser.cpp.o CMakeFiles/APB_Recongnizer.dir/src/apb_analyzer.cpp.o CMakeFiles/APB_Recongnizer.dir/src/report_generator.cpp.o CMakeFiles/APB_Recongnizer.dir/src/signal_manager.cpp.o CMakeFiles/APB_Recongnizer.dir/src/statistics.cpp.o -o APB_Recongnizer 

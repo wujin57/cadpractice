@@ -5,9 +5,9 @@ Number of Write Transactions with wait states: 0
 Average Read Cycle: 2.00 cycles
 Average Write Cycle: 2.00 cycles
 Bus Utilization: 8.43%
-Number of Idle PCLK edges: 23017
+Number of Idle Cycles: 23017
 Number of Completer: 2
-CPU Elapsed Time: 19.46 ms
+CPU Elapsed Time: 0.25 ms
 
 Number of Transactions with Timeout: 0
 Number of Out-of-Range Accesses: 0
@@ -37,16 +37,16 @@ a13: Correct
 a12: Correct
 a11: Correct
 a10: Correct
-a9: Correct
-a8: Correct
-a7: Correct
-a6: Correct
-a5: Correct
-a4: Correct
-a3: Correct
-a2: Correct
-a1: Correct
-a0: Correct
+a09: Correct
+a08: Correct
+a07: Correct
+a06: Correct
+a05: Correct
+a04: Correct
+a03: Correct
+a02: Correct
+a01: Correct
+a00: Correct
 
 Completer 1 PWDATA Connections
 d31: Correct
@@ -71,16 +71,16 @@ d13: Correct
 d12: Correct
 d11: Correct
 d10: Correct
-d9: Correct
-d8: Correct
-d7: Correct
-d6: Correct
-d5: Correct
-d4: Correct
-d3: Correct
-d2: Correct
-d1: Correct
-d0: Correct
+d09: Correct
+d08: Correct
+d07: Correct
+d06: Correct
+d05: Correct
+d04: Correct
+d03: Correct
+d02: Correct
+d01: Correct
+d00: Correct
 
 Completer 2 PADDR Connections
 a31: Correct
@@ -105,16 +105,16 @@ a13: Correct
 a12: Correct
 a11: Correct
 a10: Correct
-a9: Correct
-a8: Correct
-a7: Correct
-a6: Correct
-a5: Correct
-a4: Correct
-a3: Correct
-a2: Correct
-a1: Correct
-a0: Correct
+a09: Correct
+a08: Correct
+a07: Correct
+a06: Correct
+a05: Correct
+a04: Correct
+a03: Correct
+a02: Correct
+a01: Correct
+a00: Correct
 
 Completer 2 PWDATA Connections
 d31: Correct
@@ -139,13 +139,13 @@ d13: Correct
 d12: Correct
 d11: Correct
 d10: Correct
-d9: Correct
-d8: Correct
-d7: Correct
-d6: Correct
-d5: Correct
-d4: Correct
-d3: Correct
-d2: Correct
-d1: Correct
-d0: Correct
+d09: Correct
+d08: Correct
+d07: Correct
+d06: Correct
+d05: Correct
+d04: Correct
+d03: Correct
+d02: Correct
+d01: Correct
+d00: Correct

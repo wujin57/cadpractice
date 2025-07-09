@@ -1,9 +1,10 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 2.8.12)
 project(APB_Recognizer CXX)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXE_LINKER_FLAGS "-static")
 include_directories(src)
 
 set(SOURCES
@@ -24,4 +25,4 @@ set(SOURCES
 
 
 
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_executable(APB_Recognizer ${SOURCES})

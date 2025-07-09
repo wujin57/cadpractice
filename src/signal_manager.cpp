@@ -30,7 +30,7 @@ VcdSignalPhysicalType SignalManager::deduce_physical_type_from_name(const std::s
     if (name_suffix == "clk" || name_suffix == "pclk")
         return VcdSignalPhysicalType::PCLK;  // 兼容 pclk
     if (name_suffix == "rst_n" || name_suffix == "presetn")
-        return VcdSignalPhysicalType::PRESETN;  // 兼容 presetn
+        return VcdSignalPhysicalType::PRESETN;  
     if (name_suffix == "paddr")
         return VcdSignalPhysicalType::PADDR;
     if (name_suffix == "pwrite")
