@@ -30,7 +30,7 @@ VcdSignalPhysicalType SignalManager::deduce_physical_type_from_name(const std::s
     if (name_suffix == "clk" || name_suffix == "pclk")
         return VcdSignalPhysicalType::PCLK;  // 兼容 pclk
     if (name_suffix == "rst_n" || name_suffix == "presetn")
-        return VcdSignalPhysicalType::PRESETN;  
+        return VcdSignalPhysicalType::PRESETN;
     if (name_suffix == "paddr")
         return VcdSignalPhysicalType::PADDR;
     if (name_suffix == "pwrite")
@@ -78,75 +78,55 @@ int SignalManager::get_pwdata_width() const {
     return m_pwdata_width;
 }
 
-uint32_t SignalManager::parse_vcd_value_to_uint(const std::string& value_str, int bit_width, bool& out_has_x_or_z) {
+uint32_t SignalManager::parse_vcd_value_to_uint(const char* value_ptr, size_t value_len, bool& out_has_x_or_z) {
     out_has_x_or_z = false;
-    if (value_str.empty()) {
+    if (value_len == 0) {
         out_has_x_or_z = true;
         return 0;
     }
 
-    std::string num_part = value_str;
-    char first_char_val_str = tolower(value_str[0]);
-
-    if (value_str.length() == 1) {
-        if (first_char_val_str == '0')
-            return 0;
-        if (first_char_val_str == '1')
-            return 1;
-        if (first_char_val_str == 'x' || first_char_val_str == 'z') {  // 雖然 QA 說無 'z'，但 VCD 標準包含它
-            out_has_x_or_z = true;
-            return 0;
-        }
-
-        out_has_x_or_z = true;
-        return 0;
+    size_t start_idx = 0;
+    if (value_ptr[0] == 'b' || value_ptr[0] == 'B') {
+        start_idx = 1;
     }
 
-    if (first_char_val_str == 'b') {
-        if (value_str.length() > 1) {
-            num_part = value_str.substr(1);
-        } else {
-            out_has_x_or_z = true;
-            return 0;
-        }
-    }
-    if (num_part.empty()) {
+    if (start_idx >= value_len) {
         out_has_x_or_z = true;
         return 0;
     }
 
     uint32_t result = 0;
-    for (char c_orig : num_part) {
-        char c = tolower(c_orig);
-        result <<= 1;  // 左移一位準備下一位元
-        if (c == '1') {
-            result |= 1;
-        } else if (c == '0') {
-        } else if (c == 'x' || c == 'z') {
+    for (size_t i = start_idx; i < value_len; ++i) {
+        char c = value_ptr[i];
+        if (c == '0' || c == '1') {
+            result = (result << 1) | (c == '1');
+        } else if (c == 'x' || c == 'X' || c == 'z' || c == 'Z') {
+            result <<= 1;  // 保持位數一致
             out_has_x_or_z = true;
         } else {
-            out_has_x_or_z = true;
-            return 0;
+            continue;
         }
     }
     return result;
 }
 
 bool SignalManager::update_state_on_signal_change(
-    const std::string& vcd_id_code,
-    const std::string& value_str,
+    char vcd_id_char,
+    const char* value_ptr,
+    size_t value_len,
     SignalState& current_overall_state,
-    bool& previous_pclk_val  // in-out parameter
-) {
-    bool pclk_rose_this_event = false;
-    auto it = m_signal_definitions.find(vcd_id_code);
+    bool& previous_pclk_val) {
+    std::string id_str(1, vcd_id_char);
+    auto it = m_signal_definitions.find(id_str);
     if (it == m_signal_definitions.end()) {
         return false;
     }
     const VcdSignalInfo& sig_info = it->second;
 
     bool val_has_x = false;
-    uint32_t new_uint_val = parse_vcd_value_to_uint(value_str, sig_info.bit_width, val_has_x);
+    uint32_t new_uint_val = parse_vcd_value_to_uint(value_ptr, value_len, val_has_x);
+
+    bool pclk_rose_this_event = false;
     switch (sig_info.type) {
         case VcdSignalPhysicalType::PCLK: {
             bool new_pclk_state = (new_uint_val != 0);
@@ -187,8 +167,7 @@ bool SignalManager::update_state_on_signal_change(
             current_overall_state.pready = (new_uint_val != 0);
             current_overall_state.pready_has_x = val_has_x;
             break;
-        case VcdSignalPhysicalType::PARAMETER:
-        case VcdSignalPhysicalType::OTHER:
+        default:
             break;
     }
     return pclk_rose_this_event;

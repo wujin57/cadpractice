@@ -18,8 +18,9 @@ class SignalManager {
                          const std::string& hierarchical_name);
 
     bool update_state_on_signal_change(
-        const std::string& vcd_id_code,
-        const std::string& value_str,
+        char vcd_id_char,
+        const char* value_ptr,
+        size_t value_len,
         SignalState& current_overall_state,
         bool& previous_pclk_val);
 
@@ -35,7 +36,7 @@ class SignalManager {
     int m_pwdata_width{32};
     VcdSignalPhysicalType deduce_physical_type_from_name(const std::string& hierarchical_name, const std::string& vcd_type_str);
 
-    uint32_t parse_vcd_value_to_uint(const std::string& value_str, int bit_width, bool& out_has_x_or_z);
+    uint32_t parse_vcd_value_to_uint(const char* value_ptr, size_t value_len, bool& out_has_x_or_z);
 };
 
 }  // namespace APBSystem

@@ -7,7 +7,7 @@
 7. Bus Utilization: 6.38%
 8. Number of Idle Cycles: 71924
 9. Number of Completer: 3
-10. CPU Elapsed Time: 71.19 ms
+10. CPU Elapsed Time: 64.90 ms
 
 Number of Transactions with Timeout: 0
 Number of Out-of-Range Accesses: 0

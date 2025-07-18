@@ -107,6 +107,7 @@ void ApbAnalyzer::process_transaction_completion(const SignalState& snapshot) {
         return;
     CompleterID cid = m_current_transaction.target_completer;
     m_statistics.ensure_activity(cid);
+
     if (m_current_transaction.is_write)
         m_pending_writes.erase(m_current_transaction.paddr);
     if (!m_current_transaction.paddr_val_has_x) {

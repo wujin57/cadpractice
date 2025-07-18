@@ -9,6 +9,8 @@ Statistics::Statistics()
     : m_read_transactions_no_wait(0), m_read_transactions_with_wait(0), m_write_transactions_no_wait(0), m_write_transactions_with_wait(0), m_total_pclk_edges_for_read_transactions(0), m_total_pclk_edges_for_write_transactions(0), m_bus_active_pclk_edges(0), m_total_simulation_pclk_edges(0), m_cpu_elapsed_time_ms(0.0), m_first_valid_pclk_edge_for_stats(0) {}
 
 void Statistics::record_accessed_completer(CompleterID completer_id) {
+    if (completer_id == CompleterID::NONE || completer_id == CompleterID::UNKNOWN_COMPLETER)
+        return;
     ensure_activity(completer_id);
 }
 

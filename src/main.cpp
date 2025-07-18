@@ -56,9 +56,11 @@ int main(int argc, char* argv[]) {
         };
 
     auto value_change_callback =
-        [&](const std::string& id_code, const std::string& value_str) {
+        [&](char id_char, const char* value_ptr, size_t value_len) {
             bool pclk_did_rise = signal_manager.update_state_on_signal_change(
-                id_code, value_str, current_signal_snapshot, previous_pclk_val_for_edge_detection);
+                id_char, value_ptr, value_len,
+                current_signal_snapshot,
+                previous_pclk_val_for_edge_detection);
 
             if (pclk_did_rise) {
                 pclk_rising_edge_counter++;
@@ -79,8 +81,8 @@ int main(int argc, char* argv[]) {
                                var_definition_callback,
                                timestamp_callback,
                                value_change_callback,
-                               end_definitions_callback,  // 將我們新的回呼函式傳入
-                               end_dumpvars_callback)) {
+                               end_definitions_callback  // 將我們新的回呼函式傳入
+                               )) {
         std::cerr << "錯誤: 解析 VCD 檔案失敗: " << vcd_file_path << std::endl;
         out_file.close();
         debug_log_file.close();
