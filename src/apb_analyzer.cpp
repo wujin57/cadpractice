@@ -105,14 +105,15 @@ bool ApbAnalyzer::check_for_timeout(const SignalState& snapshot) {
 void ApbAnalyzer::process_transaction_completion(const SignalState& snapshot) {
     if (!m_current_transaction.active)
         return;
+    CompleterID cid = m_current_transaction.target_completer;
+    m_statistics.ensure_activity(cid);
     if (m_current_transaction.is_write)
         m_pending_writes.erase(m_current_transaction.paddr);
-    m_statistics.record_accessed_completer(m_current_transaction.target_completer);
     if (!m_current_transaction.paddr_val_has_x) {
-        m_statistics.record_paddr_for_corruption_analysis(m_current_transaction.target_completer, m_current_transaction.paddr);
+        m_statistics.record_paddr_sample(m_current_transaction.target_completer, m_current_transaction.paddr);
     }
     if (m_current_transaction.is_write && !snapshot.pwdata_has_x) {
-        m_statistics.record_pwdata_for_corruption_analysis(m_current_transaction.target_completer, snapshot.pwdata);
+        m_statistics.record_pwdata_sample(m_current_transaction.target_completer, snapshot.pwdata);
     }
     check_for_out_of_range(snapshot);
     uint64_t duration = m_current_pclk_edge_count - m_current_transaction.start_pclk_edge_count + 1;

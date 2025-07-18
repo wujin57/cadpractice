@@ -1,8 +1,8 @@
 // signal_manager.hpp
 #pragma once
 
-#include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include "apb_types.hpp"  // 包含 SignalState, VcdSignalPhysicalType, VcdSignalInfo
 
@@ -29,7 +29,7 @@ class SignalManager {
 
    private:
     // 使用 VCD ID code 作為 map 的 key，儲存已註冊訊號的詳細資訊
-    std::map<std::string, VcdSignalInfo> m_signal_definitions;
+    std::unordered_map<std::string, VcdSignalInfo> m_signal_definitions;
 
     int m_paddr_width{32};
     int m_pwdata_width{32};

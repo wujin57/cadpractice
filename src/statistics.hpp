@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <map>
 #include <set>
+#include <unordered_map>
 #include <vector>
 #include "apb_types.hpp"
 
@@ -12,7 +12,43 @@ class Statistics {
    public:
     Statistics();
 
-    // --- 資料收集 ---
+    inline void record_paddr_sample(CompleterID completer, uint32_t paddr_value) {
+        if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
+            return;
+        m_paddr_samples[completer].push_back(paddr_value);
+    }
+
+    inline void record_pwdata_sample(CompleterID completer, uint32_t pwdata_value) {
+        if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
+            return;
+        m_pwdata_samples[completer].push_back(pwdata_value);
+    }
+
+    inline CompleterBitActivity& ensure_activity(CompleterID completer_id) {
+        // 處理無效 ID 的邊界情況，確保穩健性
+        if (completer_id == CompleterID::NONE || completer_id == CompleterID::UNKNOWN_COMPLETER) {
+            static CompleterBitActivity empty_activity;
+            if (empty_activity.paddr_bit_details.empty() && m_paddr_width > 0) {
+                empty_activity.resize(m_paddr_width, m_pwdata_width);
+            }
+            return empty_activity;
+        }
+
+        // 核心邏輯：一次性完成查找或建立
+        auto it = m_completer_bit_activity_map.find(completer_id);
+        if (it == m_completer_bit_activity_map.end()) {
+            // 若還沒見過，就一次性完成所有初始化
+            if (m_accessed_completer_ids_set.find(completer_id) == m_accessed_completer_ids_set.end()) {
+                m_accessed_completer_ids_set.insert(completer_id);
+                m_ordered_accessed_completers.push_back(completer_id);
+            }
+
+            CompleterBitActivity tmp;
+            tmp.resize(m_paddr_width, m_pwdata_width);
+            it = m_completer_bit_activity_map.emplace(completer_id, std::move(tmp)).first;
+        }
+        return it->second;
+    }
     void record_paddr_for_corruption_analysis(CompleterID completer, uint32_t paddr_value);
     void record_pwdata_for_corruption_analysis(CompleterID completer, uint32_t pwdata_value);
     void record_bus_active_pclk_edge();
@@ -73,6 +109,8 @@ class Statistics {
     std::vector<CompleterID> m_ordered_accessed_completers;
     std::map<APBSystem::CompleterID, CompleterBitActivity> m_completer_bit_activity_map;
 
+    std::unordered_map<CompleterID, std::vector<uint32_t>> m_paddr_samples;
+    std::unordered_map<CompleterID, std::vector<uint32_t>> m_pwdata_samples;
     std::vector<OutOfRangeAccessDetail> m_out_of_range_details;
     std::vector<TransactionTimeoutDetail> m_timeout_error_details;
     std::vector<ReadWriteOverlapDetail> m_read_write_overlap_details;

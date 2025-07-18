@@ -9,43 +9,7 @@ Statistics::Statistics()
     : m_read_transactions_no_wait(0), m_read_transactions_with_wait(0), m_write_transactions_no_wait(0), m_write_transactions_with_wait(0), m_total_pclk_edges_for_read_transactions(0), m_total_pclk_edges_for_write_transactions(0), m_bus_active_pclk_edges(0), m_total_simulation_pclk_edges(0), m_cpu_elapsed_time_ms(0.0), m_first_valid_pclk_edge_for_stats(0) {}
 
 void Statistics::record_accessed_completer(CompleterID completer_id) {
-    if (completer_id == CompleterID::NONE || completer_id == CompleterID::UNKNOWN_COMPLETER)
-        return;
-    if (m_completer_bit_activity_map.find(completer_id) == m_completer_bit_activity_map.end()) {
-        m_accessed_completer_ids_set.insert(completer_id);
-        m_ordered_accessed_completers.push_back(completer_id);
-        CompleterBitActivity activity;
-        activity.resize(m_paddr_width, m_pwdata_width);
-        m_completer_bit_activity_map[completer_id] = activity;
-    }
-}
-
-void Statistics::record_paddr_for_corruption_analysis(CompleterID completer, uint32_t paddr_value) {
-    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
-        return;
-    auto& activity = m_completer_bit_activity_map.at(completer);
-    for (int i = 0; i < m_paddr_width; ++i) {
-        for (int j = i + 1; j < m_paddr_width; ++j) {
-            bool bit_i_val = (paddr_value >> i) & 1;
-            bool bit_j_val = (paddr_value >> j) & 1;
-            int combination_idx = (bit_i_val << 1) | bit_j_val;
-            activity.paddr_combinations[i][j][combination_idx]++;
-        }
-    }
-}
-
-void Statistics::record_pwdata_for_corruption_analysis(CompleterID completer, uint32_t pwdata_value) {
-    if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
-        return;
-    auto& activity = m_completer_bit_activity_map.at(completer);
-    for (int i = 0; i < m_pwdata_width; ++i) {
-        for (int j = i + 1; j < m_pwdata_width; ++j) {
-            bool bit_i_val = (pwdata_value >> i) & 1;
-            bool bit_j_val = (pwdata_value >> j) & 1;
-            int combination_idx = (bit_i_val << 1) | bit_j_val;
-            activity.pwdata_combinations[i][j][combination_idx]++;
-        }
-    }
+    ensure_activity(completer_id);
 }
 
 void Statistics::check_for_data_mirroring(CompleterID completer, uint32_t paddr, uint32_t prdata, uint64_t timestamp) {
@@ -66,6 +30,44 @@ void Statistics::check_for_data_mirroring(CompleterID completer, uint32_t paddr,
 }
 
 void Statistics::finalize_bit_activity() {
+    for (auto it = m_paddr_samples.begin(); it != m_paddr_samples.end(); ++it) {
+        const CompleterID& completer_id = it->first;
+        const std::vector<uint32_t>& samples = it->second;
+        auto activity_it = m_completer_bit_activity_map.find(completer_id);
+        if (activity_it == m_completer_bit_activity_map.end())
+            continue;
+        CompleterBitActivity& activity = activity_it->second;
+        for (size_t s = 0; s < samples.size(); ++s) {
+            uint32_t paddr_value = samples[s];
+            for (int i = 0; i < m_paddr_width; ++i) {
+                for (int j = i + 1; j < m_paddr_width; ++j) {
+                    bool bit_i_val = (paddr_value >> i) & 1;
+                    bool bit_j_val = (paddr_value >> j) & 1;
+                    int combination_idx = (bit_i_val << 1) | bit_j_val;
+                    activity.paddr_combinations[i][j][combination_idx]++;
+                }
+            }
+        }
+    }
+    for (auto it = m_pwdata_samples.begin(); it != m_pwdata_samples.end(); ++it) {
+        const CompleterID& completer_id = it->first;
+        const std::vector<uint32_t>& samples = it->second;
+        auto activity_it = m_completer_bit_activity_map.find(completer_id);
+        if (activity_it == m_completer_bit_activity_map.end())
+            continue;
+        CompleterBitActivity& activity = activity_it->second;
+        for (size_t s = 0; s < samples.size(); ++s) {
+            uint32_t pwdata_value = samples[s];
+            for (int i = 0; i < m_pwdata_width; ++i) {
+                for (int j = i + 1; j < m_pwdata_width; ++j) {
+                    bool bit_i_val = (pwdata_value >> i) & 1;
+                    bool bit_j_val = (pwdata_value >> j) & 1;
+                    int combination_idx = (bit_i_val << 1) | bit_j_val;
+                    activity.pwdata_combinations[i][j][combination_idx]++;
+                }
+            }
+        }
+    }
     const int MIN_EVIDENCE_COUNT = 1;
 
     for (auto& kv : m_completer_bit_activity_map) {

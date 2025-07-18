@@ -172,6 +172,11 @@ CMakeFiles/APB_Recognizer.dir/src/apb_analyzer.cpp.o: ../src/apb_analyzer.cpp \
   /usr/include/c++/11/set \
   /usr/include/c++/11/bits/stl_set.h \
   /usr/include/c++/11/bits/stl_multiset.h \
+  /usr/include/c++/11/unordered_map \
+  /usr/include/c++/11/bits/hashtable.h \
+  /usr/include/c++/11/bits/hashtable_policy.h \
+  /usr/include/c++/11/bits/enable_special_members.h \
+  /usr/include/c++/11/bits/unordered_map.h \
   /usr/include/c++/11/iomanip \
   /usr/include/c++/11/bits/ios_base.h \
   /usr/include/c++/11/bits/locale_classes.h \
@@ -423,6 +428,11 @@ CMakeFiles/APB_Recognizer.dir/src/main.cpp.o: ../src/main.cpp \
   /usr/include/c++/11/set \
   /usr/include/c++/11/bits/stl_set.h \
   /usr/include/c++/11/bits/stl_multiset.h \
+  /usr/include/c++/11/unordered_map \
+  /usr/include/c++/11/bits/hashtable.h \
+  /usr/include/c++/11/bits/hashtable_policy.h \
+  /usr/include/c++/11/bits/enable_special_members.h \
+  /usr/include/c++/11/bits/unordered_map.h \
   ../src/report_generator.hpp \
   ../src/signal_manager.hpp \
   ../src/vcd_parser.hpp \
@@ -609,27 +619,32 @@ CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o: ../src/report_generato
   /usr/include/c++/11/istream \
   /usr/include/c++/11/bits/istream.tcc \
   ../src/statistics.hpp \
-  /usr/include/c++/11/map \
+  /usr/include/c++/11/set \
   /usr/include/c++/11/bits/stl_tree.h \
   /usr/include/c++/11/ext/aligned_buffer.h \
-  /usr/include/c++/11/bits/stl_map.h \
+  /usr/include/c++/11/bits/stl_set.h \
+  /usr/include/c++/11/bits/stl_multiset.h \
+  /usr/include/c++/11/bits/erase_if.h \
+  /usr/include/c++/11/unordered_map \
+  /usr/include/c++/11/bits/hashtable.h \
+  /usr/include/c++/11/bits/hashtable_policy.h \
   /usr/include/c++/11/tuple \
   /usr/include/c++/11/utility \
   /usr/include/c++/11/bits/stl_relops.h \
   /usr/include/c++/11/array \
   /usr/include/c++/11/bits/uses_allocator.h \
   /usr/include/c++/11/bits/invoke.h \
-  /usr/include/c++/11/bits/stl_multimap.h \
-  /usr/include/c++/11/bits/erase_if.h \
-  /usr/include/c++/11/set \
-  /usr/include/c++/11/bits/stl_set.h \
-  /usr/include/c++/11/bits/stl_multiset.h \
+  /usr/include/c++/11/bits/enable_special_members.h \
+  /usr/include/c++/11/bits/unordered_map.h \
   /usr/include/c++/11/vector \
   /usr/include/c++/11/bits/stl_uninitialized.h \
   /usr/include/c++/11/bits/stl_vector.h \
   /usr/include/c++/11/bits/stl_bvector.h \
   /usr/include/c++/11/bits/vector.tcc \
   ../src/apb_types.hpp \
+  /usr/include/c++/11/map \
+  /usr/include/c++/11/bits/stl_map.h \
+  /usr/include/c++/11/bits/stl_multimap.h \
   /usr/include/c++/11/algorithm \
   /usr/include/c++/11/bits/stl_algo.h \
   /usr/include/c++/11/bits/algorithmfwd.h \
@@ -653,9 +668,7 @@ CMakeFiles/APB_Recognizer.dir/src/report_generator.cpp.o: ../src/report_generato
 CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: ../src/signal_manager.cpp \
   /usr/include/stdc-predef.h \
   ../src/signal_manager.hpp \
-  /usr/include/c++/11/map \
-  /usr/include/c++/11/bits/stl_tree.h \
-  /usr/include/c++/11/bits/stl_algobase.h \
+  /usr/include/c++/11/string \
   /usr/include/x86_64-linux-gnu/c++/11/bits/c++config.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/os_defines.h \
   /usr/include/features.h \
@@ -667,6 +680,10 @@ CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: ../src/signal_manager.cp
   /usr/include/x86_64-linux-gnu/gnu/stubs.h \
   /usr/include/x86_64-linux-gnu/gnu/stubs-64.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/cpu_defines.h \
+  /usr/include/c++/11/bits/stringfwd.h \
+  /usr/include/c++/11/bits/memoryfwd.h \
+  /usr/include/c++/11/bits/char_traits.h \
+  /usr/include/c++/11/bits/stl_algobase.h \
   /usr/include/c++/11/bits/functexcept.h \
   /usr/include/c++/11/bits/exception_defines.h \
   /usr/include/c++/11/bits/cpp_type_traits.h \
@@ -683,32 +700,6 @@ CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: ../src/signal_manager.cp
   /usr/include/c++/11/bits/ptr_traits.h \
   /usr/include/c++/11/debug/debug.h \
   /usr/include/c++/11/bits/predefined_ops.h \
-  /usr/include/c++/11/bits/allocator.h \
-  /usr/include/x86_64-linux-gnu/c++/11/bits/c++allocator.h \
-  /usr/include/c++/11/ext/new_allocator.h \
-  /usr/include/c++/11/new \
-  /usr/include/c++/11/bits/exception.h \
-  /usr/include/c++/11/bits/memoryfwd.h \
-  /usr/include/c++/11/bits/stl_function.h \
-  /usr/include/c++/11/backward/binders.h \
-  /usr/include/c++/11/ext/alloc_traits.h \
-  /usr/include/c++/11/bits/alloc_traits.h \
-  /usr/include/c++/11/bits/stl_construct.h \
-  /usr/include/c++/11/ext/aligned_buffer.h \
-  /usr/include/c++/11/bits/stl_map.h \
-  /usr/include/c++/11/initializer_list \
-  /usr/include/c++/11/tuple \
-  /usr/include/c++/11/utility \
-  /usr/include/c++/11/bits/stl_relops.h \
-  /usr/include/c++/11/array \
-  /usr/include/c++/11/bits/range_access.h \
-  /usr/include/c++/11/bits/uses_allocator.h \
-  /usr/include/c++/11/bits/invoke.h \
-  /usr/include/c++/11/bits/stl_multimap.h \
-  /usr/include/c++/11/bits/erase_if.h \
-  /usr/include/c++/11/string \
-  /usr/include/c++/11/bits/stringfwd.h \
-  /usr/include/c++/11/bits/char_traits.h \
   /usr/include/c++/11/bits/postypes.h \
   /usr/include/c++/11/cwchar \
   /usr/include/wchar.h \
@@ -733,6 +724,11 @@ CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: ../src/signal_manager.cp
   /usr/include/x86_64-linux-gnu/bits/time64.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+  /usr/include/c++/11/bits/allocator.h \
+  /usr/include/x86_64-linux-gnu/c++/11/bits/c++allocator.h \
+  /usr/include/c++/11/ext/new_allocator.h \
+  /usr/include/c++/11/new \
+  /usr/include/c++/11/bits/exception.h \
   /usr/include/c++/11/bits/localefwd.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/c++locale.h \
   /usr/include/c++/11/clocale \
@@ -745,6 +741,10 @@ CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: ../src/signal_manager.cp
   /usr/include/x86_64-linux-gnu/bits/endianness.h \
   /usr/include/c++/11/bits/ostream_insert.h \
   /usr/include/c++/11/bits/cxxabi_forced.h \
+  /usr/include/c++/11/bits/stl_function.h \
+  /usr/include/c++/11/backward/binders.h \
+  /usr/include/c++/11/bits/range_access.h \
+  /usr/include/c++/11/initializer_list \
   /usr/include/c++/11/bits/basic_string.h \
   /usr/include/c++/11/ext/atomicity.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/gthr.h \
@@ -777,6 +777,9 @@ CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: ../src/signal_manager.cp
   /usr/include/x86_64-linux-gnu/bits/pthread_stack_min-dynamic.h \
   /usr/include/x86_64-linux-gnu/c++/11/bits/atomic_word.h \
   /usr/include/x86_64-linux-gnu/sys/single_threaded.h \
+  /usr/include/c++/11/ext/alloc_traits.h \
+  /usr/include/c++/11/bits/alloc_traits.h \
+  /usr/include/c++/11/bits/stl_construct.h \
   /usr/include/c++/11/ext/string_conversions.h \
   /usr/include/c++/11/cstdlib \
   /usr/include/stdlib.h \
@@ -811,12 +814,29 @@ CMakeFiles/APB_Recognizer.dir/src/signal_manager.cpp.o: ../src/signal_manager.cp
   /usr/include/c++/11/bits/functional_hash.h \
   /usr/include/c++/11/bits/hash_bytes.h \
   /usr/include/c++/11/bits/basic_string.tcc \
+  /usr/include/c++/11/unordered_map \
+  /usr/include/c++/11/ext/aligned_buffer.h \
+  /usr/include/c++/11/bits/hashtable.h \
+  /usr/include/c++/11/bits/hashtable_policy.h \
+  /usr/include/c++/11/tuple \
+  /usr/include/c++/11/utility \
+  /usr/include/c++/11/bits/stl_relops.h \
+  /usr/include/c++/11/array \
+  /usr/include/c++/11/bits/uses_allocator.h \
+  /usr/include/c++/11/bits/invoke.h \
+  /usr/include/c++/11/bits/enable_special_members.h \
+  /usr/include/c++/11/bits/unordered_map.h \
+  /usr/include/c++/11/bits/erase_if.h \
   /usr/include/c++/11/vector \
   /usr/include/c++/11/bits/stl_uninitialized.h \
   /usr/include/c++/11/bits/stl_vector.h \
   /usr/include/c++/11/bits/stl_bvector.h \
   /usr/include/c++/11/bits/vector.tcc \
   ../src/apb_types.hpp \
+  /usr/include/c++/11/map \
+  /usr/include/c++/11/bits/stl_tree.h \
+  /usr/include/c++/11/bits/stl_map.h \
+  /usr/include/c++/11/bits/stl_multimap.h \
   /usr/include/c++/11/algorithm \
   /usr/include/c++/11/bits/stl_algo.h \
   /usr/include/c++/11/bits/algorithmfwd.h \
@@ -877,7 +897,7 @@ CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o: ../src/statistics.cpp \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-intn.h \
   /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
-  /usr/include/c++/11/map \
+  /usr/include/c++/11/set \
   /usr/include/c++/11/bits/stl_tree.h \
   /usr/include/c++/11/bits/stl_algobase.h \
   /usr/include/c++/11/bits/functexcept.h \
@@ -908,28 +928,33 @@ CMakeFiles/APB_Recognizer.dir/src/statistics.cpp.o: ../src/statistics.cpp \
   /usr/include/c++/11/bits/alloc_traits.h \
   /usr/include/c++/11/bits/stl_construct.h \
   /usr/include/c++/11/ext/aligned_buffer.h \
-  /usr/include/c++/11/bits/stl_map.h \
+  /usr/include/c++/11/bits/stl_set.h \
   /usr/include/c++/11/initializer_list \
+  /usr/include/c++/11/bits/stl_multiset.h \
+  /usr/include/c++/11/bits/range_access.h \
+  /usr/include/c++/11/bits/erase_if.h \
+  /usr/include/c++/11/unordered_map \
+  /usr/include/c++/11/bits/functional_hash.h \
+  /usr/include/c++/11/bits/hash_bytes.h \
+  /usr/include/c++/11/bits/hashtable.h \
+  /usr/include/c++/11/bits/hashtable_policy.h \
   /usr/include/c++/11/tuple \
   /usr/include/c++/11/utility \
   /usr/include/c++/11/bits/stl_relops.h \
   /usr/include/c++/11/array \
-  /usr/include/c++/11/bits/range_access.h \
   /usr/include/c++/11/bits/uses_allocator.h \
   /usr/include/c++/11/bits/invoke.h \
-  /usr/include/c++/11/bits/stl_multimap.h \
-  /usr/include/c++/11/bits/erase_if.h \
-  /usr/include/c++/11/set \
-  /usr/include/c++/11/bits/stl_set.h \
-  /usr/include/c++/11/bits/stl_multiset.h \
+  /usr/include/c++/11/bits/enable_special_members.h \
+  /usr/include/c++/11/bits/unordered_map.h \
   /usr/include/c++/11/vector \
   /usr/include/c++/11/bits/stl_uninitialized.h \
   /usr/include/c++/11/bits/stl_vector.h \
   /usr/include/c++/11/bits/stl_bvector.h \
-  /usr/include/c++/11/bits/functional_hash.h \
-  /usr/include/c++/11/bits/hash_bytes.h \
   /usr/include/c++/11/bits/vector.tcc \
   ../src/apb_types.hpp \
+  /usr/include/c++/11/map \
+  /usr/include/c++/11/bits/stl_map.h \
+  /usr/include/c++/11/bits/stl_multimap.h \
   /usr/include/c++/11/string \
   /usr/include/c++/11/bits/stringfwd.h \
   /usr/include/c++/11/bits/char_traits.h \
@@ -1307,11 +1332,13 @@ CMakeFiles/APB_Recognizer.dir/src/vcd_parser.cpp.o: ../src/vcd_parser.cpp \
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_statx.h:
 
-/usr/include/x86_64-linux-gnu/bits/statx-generic.h:
-
 /usr/include/x86_64-linux-gnu/asm/posix_types.h:
 
 /usr/include/linux/posix_types.h:
+
+/usr/include/x86_64-linux-gnu/asm/types.h:
+
+/usr/include/linux/stat.h:
 
 /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h:
 
@@ -1405,6 +1432,8 @@ CMakeFiles/APB_Recognizer.dir/src/vcd_parser.cpp.o: ../src/vcd_parser.cpp \
 
 /usr/include/c++/11/cctype:
 
+/usr/include/c++/11/unordered_map:
+
 /usr/include/x86_64-linux-gnu/bits/stdint-intn.h:
 
 /usr/include/x86_64-linux-gnu/bits/types.h:
@@ -1418,6 +1447,8 @@ CMakeFiles/APB_Recognizer.dir/src/vcd_parser.cpp.o: ../src/vcd_parser.cpp \
 /usr/include/c++/11/cstring:
 
 /usr/include/x86_64-linux-gnu/bits/types/__FILE.h:
+
+/usr/include/c++/11/bits/unordered_map.h:
 
 /usr/include/c++/11/ext/alloc_traits.h:
 
@@ -1717,9 +1748,13 @@ CMakeFiles/APB_Recognizer.dir/src/vcd_parser.cpp.o: ../src/vcd_parser.cpp \
 
 /usr/include/c++/11/bits/stl_set.h:
 
-/usr/include/c++/11/bits/locale_classes.h:
+/usr/include/c++/11/bits/hashtable.h:
 
-/usr/include/linux/stat.h:
+/usr/include/x86_64-linux-gnu/bits/statx-generic.h:
+
+/usr/include/c++/11/bits/hashtable_policy.h:
+
+/usr/include/c++/11/bits/locale_classes.h:
 
 /usr/include/c++/11/bits/locale_classes.tcc:
 
@@ -1753,13 +1788,15 @@ CMakeFiles/APB_Recognizer.dir/src/vcd_parser.cpp.o: ../src/vcd_parser.cpp \
 
 /usr/include/c++/11/cwctype:
 
-/usr/include/x86_64-linux-gnu/asm/types.h:
-
 /usr/include/string.h:
 
 /usr/include/c++/11/bits/streambuf.tcc:
 
 /usr/include/c++/11/bits/streambuf_iterator.h:
+
+/usr/include/linux/types.h:
+
+/usr/include/x86_64-linux-gnu/c++/11/bits/ctype_inline.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_tm.h:
 
@@ -1782,6 +1819,8 @@ CMakeFiles/APB_Recognizer.dir/src/vcd_parser.cpp.o: ../src/vcd_parser.cpp \
 /usr/include/c++/11/bits/basic_ios.h:
 
 /usr/include/c++/11/bits/codecvt.h:
+
+/usr/include/c++/11/bits/enable_special_members.h:
 
 /usr/include/c++/11/bits/basic_ios.tcc:
 
@@ -1814,10 +1853,6 @@ CMakeFiles/APB_Recognizer.dir/src/vcd_parser.cpp.o: ../src/vcd_parser.cpp \
 ../src/signal_manager.hpp:
 
 ../src/vcd_parser.hpp:
-
-/usr/include/x86_64-linux-gnu/c++/11/bits/ctype_inline.h:
-
-/usr/include/linux/types.h:
 
 /usr/include/linux/stddef.h:
 
