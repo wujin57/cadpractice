@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <vector>
+
 namespace APBSystem {
 ReportGenerator::ReportGenerator() {
 }
@@ -28,19 +30,19 @@ static std::string bit_detail_status_to_report_string(const APBSystem::BitDetail
 }
 void ReportGenerator::generate_apb_transaction_report(const Statistics& stats, std::ostream& out) const {
     // Section 1: Transaction Statistics
-    out << "1. Number of Read Transactions with no wait states: " << stats.get_read_transactions_no_wait() << "\n";
-    out << "2. Number of Read Transactions with wait states: " << stats.get_read_transactions_with_wait() << "\n";
-    out << "3. Number of Write Transactions with no wait states: " << stats.get_write_transactions_no_wait() << "\n";
-    out << "4. Number of Write Transactions with wait states: " << stats.get_write_transactions_with_wait() << "\n";
+    out << "Number of Read Transactions with no wait states: " << stats.get_read_transactions_no_wait() << "\n";
+    out << "Number of Read Transactions with wait states: " << stats.get_read_transactions_with_wait() << "\n";
+    out << "Number of Write Transactions with no wait states: " << stats.get_write_transactions_no_wait() << "\n";
+    out << "Number of Write Transactions with wait states: " << stats.get_write_transactions_with_wait() << "\n";
     out << std::fixed << std::setprecision(2);
-    out << "5. Average Read Cycle: " << stats.get_average_read_cycle_duration() << " cycles\n";
-    out << "6. Average Write Cycle: " << stats.get_average_write_cycle_duration() << " cycles\n";
-    out << "7. Bus Utilization: " << stats.get_bus_utilization_percentage() << "%\n";
+    out << "Average Read Cycle: " << stats.get_average_read_cycle_duration() << " cycles\n";
+    out << "Average Write Cycle: " << stats.get_average_write_cycle_duration() << " cycles\n";
+    out << "Bus Utilization: " << stats.get_bus_utilization_percentage() << "%\n";
     out << std::defaultfloat << std::setprecision(0);
-    out << "8. Number of Idle Cycles: " << stats.get_num_idle_pclk_edges() << "\n";
-    out << "9. Number of Completer: " << stats.get_number_of_unique_completers_accessed() << "\n";
+    out << "Number of Idle Cycles: " << stats.get_num_idle_pclk_edges() << "\n";
+    out << "Number of Completer: " << stats.get_number_of_unique_completers_accessed() << "\n";
     out << std::fixed << std::setprecision(2);
-    out << "10. CPU Elapsed Time: " << stats.get_cpu_elapsed_time_ms() << " ms\n";
+    out << "CPU Elapsed Time: " << stats.get_cpu_elapsed_time_ms() << " ms\n";
     out << std::defaultfloat << std::setprecision(6);
 
     // Section 2: Error Summary
@@ -50,22 +52,32 @@ void ReportGenerator::generate_apb_transaction_report(const Statistics& stats, s
     out << "Number of Read-Write Overlap Errors: " << stats.get_read_write_overlap_details().size() << "\n";
 
     // Section 3: Completer Connection Status
-    const auto& completers = stats.get_ordered_accessed_completers();
     const auto& activity_map = stats.get_completer_bit_activity_map();
-    for (int i = 0; i < completers.size(); ++i) {
-        const auto& cid = completers[i];
-        out << "\nCompleter " << (i + 1) << " PADDR Connections\n";
-        if (activity_map.count(cid)) {
-            const auto& paddr_details = activity_map.at(cid).paddr_bit_details;
-            for (int j = paddr_details.size() - 1; j >= 0; --j) {
-                out << "a" << std::setw(2) << std::setfill('0') << j << ": " << bit_detail_status_to_report_string(paddr_details[j], 'a') << "\n";
+    const std::vector<std::pair<int, CompleterID>> fixed_completer_order = {
+        {1, CompleterID::UART},
+        {2, CompleterID::GPIO},
+        {3, CompleterID::SPI_MASTER}};
+    for (const auto& comp_pair : fixed_completer_order) {
+        int completer_num = comp_pair.first;
+        CompleterID cid = comp_pair.second;
+
+        auto it = activity_map.find(cid);
+        if (it != activity_map.end()) {
+            out << "\nCompleter " << completer_num << " PADDR Connections\n";
+            const auto& paddr_details = it->second.paddr_bit_details;
+            if (!paddr_details.empty()) {
+                for (int j = paddr_details.size() - 1; j >= 0; --j) {
+                    out << "a" << std::setw(2) << std::setfill('0') << j << ": " << bit_detail_status_to_report_string(paddr_details[j], 'a') << "\n";
+                }
             }
-        }
-        out << "\nCompleter " << (i + 1) << " PWDATA Connections\n";
-        if (activity_map.count(cid)) {
-            const auto& pwdata_details = activity_map.at(cid).pwdata_bit_details;
-            for (int j = pwdata_details.size() - 1; j >= 0; --j) {
-                out << "d" << std::setw(2) << std::setfill('0') << j << ": " << bit_detail_status_to_report_string(pwdata_details[j], 'd') << "\n";
+
+            out << "\nCompleter " << completer_num << " PWDATA Connections\n";
+            const auto& pwdata_details = it->second.pwdata_bit_details;
+            if (!pwdata_details.empty()) {
+                for (int j = pwdata_details.size() - 1; j >= 1; --j) {
+                    out << "d" << std::setw(2) << std::setfill('0') << j << ": " << bit_detail_status_to_report_string(pwdata_details[j], 'd') << "\n";
+                }
+                out << "d" << std::setw(2) << std::setfill('0') << 0 << ": " << bit_detail_status_to_report_string(pwdata_details[0], 'd');
             }
         }
     }
@@ -93,12 +105,12 @@ void ReportGenerator::generate_apb_transaction_report(const Statistics& stats, s
     }
     for (const auto& d : stats.get_address_corruption_details()) {
         std::ostringstream oss;
-        oss << "Address Corruption -> Expected PADDR: 0x" << std::hex << d.corrupted_addr << ", Received: 0x" << d.corrupted_addr << " (a" << d.bit_a << "-a" << d.bit_b << " Floating)";
+        oss << "Address Corruption -> a" << d.bit_a << "-a" << d.bit_b << " Floating";
         errors.push_back({d.timestamp, oss.str()});
     }
     for (const auto& d : stats.get_data_corruption_details()) {
         std::ostringstream oss;
-        oss << "Data Corruption -> Expected PWDATA: 0x" << std::hex << d.corrupted_pwdata << ", Received: 0x" << d.corrupted_pwdata << " (d" << d.bit_a << "-d" << d.bit_b << " Floating)";
+        oss << "Data Corruption -> d" << d.bit_a << "-d" << d.bit_b << " Floating";
         errors.push_back({d.timestamp, oss.str()});
     }
 

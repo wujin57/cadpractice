@@ -77,21 +77,18 @@ void Statistics::finalize_bit_activity() {
 
         // --- PADDR 分析 ---
         {
-            // 階段一：找出所有「潛在的」短路候選對
             std::vector<std::pair<int, int>> candidate_pairs;
-            for (int i = 0; i < m_paddr_width; ++i) {
-                for (int j = i + 1; j < m_paddr_width; ++j) {
-                    const auto& counts = act.paddr_combinations[i][j];
-                    bool has_independent_evidence = (counts[1] > 0) || (counts[2] > 0);
-                    bool has_sufficient_sync_evidence = (counts[0] >= MIN_EVIDENCE_COUNT) && (counts[3] >= MIN_EVIDENCE_COUNT);
+            // 迴圈從 31 對相鄰位元中尋找，而不是 496 對所有組合
+            for (int i = 0; i < m_paddr_width - 1; ++i) {
+                int j = i + 1;  // 只檢查相鄰的位元
+                const auto& counts = act.paddr_combinations[i][j];
+                bool has_independent_evidence = (counts[1] > 0) || (counts[2] > 0);
+                bool has_sufficient_sync_evidence = (counts[0] >= MIN_EVIDENCE_COUNT) && (counts[3] >= MIN_EVIDENCE_COUNT);
 
-                    if (!has_independent_evidence && has_sufficient_sync_evidence) {
-                        candidate_pairs.push_back({i, j});
-                    }
+                if (!has_independent_evidence && has_sufficient_sync_evidence) {
+                    candidate_pairs.push_back({i, j});
                 }
             }
-
-            // 階段二：應用「最多一對短路」的全局約束
             if (candidate_pairs.size() == 1) {
                 int bit_a = candidate_pairs[0].first;
                 int bit_b = candidate_pairs[0].second;
@@ -100,24 +97,21 @@ void Statistics::finalize_bit_activity() {
                 act.paddr_bit_details[bit_b].status = BitConnectionStatus::SHORTED;
                 act.paddr_bit_details[bit_b].shorted_with_bit_index = bit_a;
             }
-            // 如果候選對為 0 或大於 1，則不做任何事，保持所有位元為 CORRECT
         }
 
         // --- PWDATA 分析 (邏輯完全相同) ---
         {
             std::vector<std::pair<int, int>> candidate_pairs;
-            for (int i = 0; i < m_pwdata_width; ++i) {
-                for (int j = i + 1; j < m_pwdata_width; ++j) {
-                    const auto& counts = act.pwdata_combinations[i][j];
-                    bool has_independent_evidence = (counts[1] > 0) || (counts[2] > 0);
-                    bool has_sufficient_sync_evidence = (counts[0] >= MIN_EVIDENCE_COUNT) && (counts[3] >= MIN_EVIDENCE_COUNT);
+            for (int i = 0; i < m_pwdata_width - 1; ++i) {
+                int j = i + 1;
+                const auto& counts = act.pwdata_combinations[i][j];
+                bool has_independent_evidence = (counts[1] > 0) || (counts[2] > 0);
+                bool has_sufficient_sync_evidence = (counts[0] >= MIN_EVIDENCE_COUNT) && (counts[3] >= MIN_EVIDENCE_COUNT);
 
-                    if (!has_independent_evidence && has_sufficient_sync_evidence) {
-                        candidate_pairs.push_back({i, j});
-                    }
+                if (!has_independent_evidence && has_sufficient_sync_evidence) {
+                    candidate_pairs.push_back({i, j});
                 }
             }
-
             if (candidate_pairs.size() == 1) {
                 int bit_a = candidate_pairs[0].first;
                 int bit_b = candidate_pairs[0].second;

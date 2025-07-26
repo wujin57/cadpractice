@@ -4,10 +4,10 @@
 4. Number of Write Transactions with wait states: 0
 5. Average Read Cycle: 2.00 cycles
 6. Average Write Cycle: 2.00 cycles
-7. Bus Utilization: 6.38%
-8. Number of Idle Cycles: 71924
+7. Bus Utilization: 7.22%
+8. Number of Idle Cycles: 62987
 9. Number of Completer: 3
-10. CPU Elapsed Time: 64.90 ms
+10. CPU Elapsed Time: 58.85 ms
 
 Number of Transactions with Timeout: 0
 Number of Out-of-Range Accesses: 0
@@ -81,7 +81,6 @@ d03: Correct
 d02: Correct
 d01: Correct
 d00: Correct
-
 Completer 2 PADDR Connections
 a31: Correct
 a30: Correct
@@ -149,7 +148,6 @@ d03: Correct
 d02: Correct
 d01: Correct
 d00: Correct
-
 Completer 3 PADDR Connections
 a31: Correct
 a30: Correct
@@ -217,4 +215,3 @@ d03: Correct
 d02: Correct
 d01: Correct
 d00: Correct
-

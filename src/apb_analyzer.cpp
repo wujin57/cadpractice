@@ -93,7 +93,7 @@ void ApbAnalyzer::handle_access_state(const SignalState& snapshot) {
     m_current_transaction.had_wait_state = true;
 }
 bool ApbAnalyzer::check_for_timeout(const SignalState& snapshot) {
-    if (!m_current_transaction.active || m_transaction_cycle_counter <= 100)
+    if (!m_current_transaction.active || m_transaction_cycle_counter <= 1000)
         return false;
     m_statistics.record_timeout_error({m_current_transaction.transaction_start_time_ps, m_current_transaction.paddr});
     if (m_current_transaction.is_write)
@@ -167,14 +167,11 @@ void ApbAnalyzer::check_for_out_of_range(const SignalState& snapshot) {
     }
 }
 
-// MODIFIED: 重構此函式以提高穩健性
 void ApbAnalyzer::detect_all_corruption_errors() {
     const auto& activity_map = m_statistics.get_completer_bit_activity_map();
-
     for (const auto& transaction : m_completed_transactions) {
         if (transaction.paddr_val_has_x)
             continue;
-
         CompleterID cid = transaction.target_completer;
         if (cid == CompleterID::NONE || cid == CompleterID::UNKNOWN_COMPLETER)
             continue;
@@ -182,38 +179,28 @@ void ApbAnalyzer::detect_all_corruption_errors() {
         auto it = activity_map.find(cid);
         if (it == activity_map.end())
             continue;
-
         const auto& activity = it->second;
-        bool error_found_for_this_transaction = false;
 
         // 偵測 Address Corruption
-        if (!activity.paddr_bit_details.empty()) {  // 安全性檢查
-            for (size_t i = 0; i < activity.paddr_bit_details.size(); ++i) {
-                const auto& bi = activity.paddr_bit_details[i];
-                if (bi.status == BitConnectionStatus::SHORTED && bi.shorted_with_bit_index > static_cast<int>(i)) {
-                    m_statistics.record_address_corruption({transaction.transaction_start_time_ps, transaction.paddr, static_cast<int>(i), bi.shorted_with_bit_index});
-                    error_found_for_this_transaction = true;
-                    break;  // 找到一對短路就足以標記此交易，跳出內層迴圈
-                }
+        for (size_t i = 0; i < activity.paddr_bit_details.size(); ++i) {
+            const auto& bi = activity.paddr_bit_details[i];
+            if (bi.status == BitConnectionStatus::SHORTED && bi.shorted_with_bit_index > static_cast<int>(i)) {
+                m_statistics.record_address_corruption({transaction.transaction_start_time_ps, static_cast<int>(i), bi.shorted_with_bit_index});
+                goto next_transaction;
             }
-        }
-
-        if (error_found_for_this_transaction) {
-            continue;  // 既然已找到位址錯誤，就繼續處理下一筆交易
         }
 
         // 偵測 Data Corruption (僅針對寫入交易)
         if (transaction.is_write && !transaction.pwdata_val_has_x) {
-            if (!activity.pwdata_bit_details.empty()) {  // 安全性檢查
-                for (size_t i = 0; i < activity.pwdata_bit_details.size(); ++i) {
-                    const auto& bi = activity.pwdata_bit_details[i];
-                    if (bi.status == BitConnectionStatus::SHORTED && bi.shorted_with_bit_index > static_cast<int>(i)) {
-                        m_statistics.record_data_corruption({transaction.transaction_start_time_ps, transaction.paddr, transaction.pwdata_val, static_cast<int>(i), bi.shorted_with_bit_index});
-                        break;  // 找到一對短路就足以標記此交易，跳出內層迴圈
-                    }
+            for (size_t i = 0; i < activity.pwdata_bit_details.size(); ++i) {
+                const auto& bi = activity.pwdata_bit_details[i];
+                if (bi.status == BitConnectionStatus::SHORTED && bi.shorted_with_bit_index > static_cast<int>(i)) {
+                    m_statistics.record_data_corruption({transaction.transaction_start_time_ps, static_cast<int>(i), bi.shorted_with_bit_index});
+                    goto next_transaction;
                 }
             }
         }
+    next_transaction:;
     }
 }
 

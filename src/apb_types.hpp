@@ -141,13 +141,10 @@ struct ReadWriteOverlapDetail {
 };
 struct AddressCorruptionDetail {
     uint64_t timestamp;
-    uint32_t corrupted_addr;
     int bit_a, bit_b;
 };
 struct DataCorruptionDetail {
     uint64_t timestamp;
-    uint32_t paddr;
-    uint32_t corrupted_pwdata;
     int bit_a, bit_b;
 };
 
