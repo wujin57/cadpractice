@@ -1,13 +1,13 @@
-1. Number of Read Transactions with no wait states: 2181
-2. Number of Read Transactions with wait states: 0
-3. Number of Write Transactions with no wait states: 268
-4. Number of Write Transactions with wait states: 0
-5. Average Read Cycle: 2.00 cycles
-6. Average Write Cycle: 2.00 cycles
-7. Bus Utilization: 7.22%
-8. Number of Idle Cycles: 62987
-9. Number of Completer: 3
-10. CPU Elapsed Time: 58.85 ms
+Number of Read Transactions with no wait states: 2181
+Number of Read Transactions with wait states: 0
+Number of Write Transactions with no wait states: 268
+Number of Write Transactions with wait states: 0
+Average Read Cycle: 2.00 cycles
+Average Write Cycle: 2.00 cycles
+Bus Utilization: 7.22%
+Number of Idle Cycles: 62987
+Number of Completer: 3
+CPU Elapsed Time: 50.14 ms
 
 Number of Transactions with Timeout: 0
 Number of Out-of-Range Accesses: 0
@@ -81,6 +81,7 @@ d03: Correct
 d02: Correct
 d01: Correct
 d00: Correct
+
 Completer 2 PADDR Connections
 a31: Correct
 a30: Correct
@@ -148,6 +149,7 @@ d03: Correct
 d02: Correct
 d01: Correct
 d00: Correct
+
 Completer 3 PADDR Connections
 a31: Correct
 a30: Correct
