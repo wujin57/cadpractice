@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "apb_types.hpp"  // 包含 SignalState, VcdSignalPhysicalType, VcdSignalInfo
+#include "apb_types.hpp"
 
 namespace APBSystem {
 
@@ -29,7 +29,6 @@ class SignalManager {
     int get_pwdata_width() const;
 
    private:
-    // 使用 VCD ID code 作為 map 的 key，儲存已註冊訊號的詳細資訊
     std::unordered_map<std::string, VcdSignalInfo> m_signal_definitions;
 
     int m_paddr_width{32};

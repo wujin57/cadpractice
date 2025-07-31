@@ -4,9 +4,8 @@
 
 namespace APBSystem {
 
-// ... (fsm_state_to_string, 建構函式, analyze_on_pclk_rising_edge, handle_idle_state, handle_setup_state, handle_access_state, check_for_timeout, process_transaction_completion, finalize_analysis, get_completer_id_from_paddr, check_for_out_of_range 皆無變動)
-ApbAnalyzer::ApbAnalyzer(Statistics& statistics, std::ostream& debug_stream)
-    : m_statistics(statistics), m_debug_stream(debug_stream), m_current_apb_fsm_state(ApbFsmState::IDLE), m_current_pclk_edge_count(0), m_system_out_of_reset(false), m_first_valid_pclk_edge_for_stats(0), m_transaction_cycle_counter(0) {
+ApbAnalyzer::ApbAnalyzer(Statistics& statistics /*, std::ostream& debug_stream*/)
+    : m_statistics(statistics) /*, m_debug_stream(debug_stream)*/, m_current_apb_fsm_state(ApbFsmState::IDLE), m_current_pclk_edge_count(0), m_system_out_of_reset(false), m_first_valid_pclk_edge_for_stats(0), m_transaction_cycle_counter(0), m_completed_transaction_count(0) {
     m_current_transaction.reset();
 }
 void ApbAnalyzer::analyze_on_pclk_rising_edge(const SignalState& snapshot, uint64_t pclk_edge_count) {
@@ -40,7 +39,7 @@ void ApbAnalyzer::handle_idle_state(const SignalState& snapshot) {
     m_current_apb_fsm_state = ApbFsmState::SETUP;
     m_current_transaction.active = true;
     m_current_transaction.start_pclk_edge_count = m_current_pclk_edge_count;
-    m_current_transaction.transaction_start_time_ps = snapshot.timestamp_ps;
+    m_current_transaction.transaction_start_time_ps = snapshot.timestamp;
     m_current_transaction.is_write = snapshot.pwrite && !snapshot.pwrite_has_x;
     m_current_transaction.paddr = snapshot.paddr;
     m_current_transaction.paddr_val_has_x = snapshot.paddr_has_x;
@@ -49,10 +48,13 @@ void ApbAnalyzer::handle_idle_state(const SignalState& snapshot) {
     m_transaction_cycle_counter = 1;
     m_current_transaction.target_completer = snapshot.paddr_has_x ? CompleterID::UNKNOWN_COMPLETER : get_completer_id_from_paddr(snapshot.paddr);
     if (m_current_transaction.is_write) {
-        m_pending_writes[m_current_transaction.paddr] = {snapshot.timestamp_ps, m_current_pclk_edge_count};
+        m_pending_writes[m_current_transaction.paddr] = {snapshot.timestamp, m_current_pclk_edge_count};
     } else {
-        if (m_pending_writes.count(m_current_transaction.paddr)) {
-            m_statistics.record_read_write_overlap_error({snapshot.timestamp_ps, m_current_transaction.paddr});
+        auto it = m_pending_writes.find(m_current_transaction.paddr);
+        if (it != m_pending_writes.end()) {
+            m_preliminary_overlap_errors.push_back({{snapshot.timestamp, m_current_transaction.paddr},
+                                                    it->second.start_time_ps,
+                                                    it->first});
         }
     }
 }
@@ -105,18 +107,17 @@ bool ApbAnalyzer::check_for_timeout(const SignalState& snapshot) {
 void ApbAnalyzer::process_transaction_completion(const SignalState& snapshot) {
     if (!m_current_transaction.active)
         return;
-    CompleterID cid = m_current_transaction.target_completer;
-    m_statistics.ensure_activity(cid);
-
+    m_completed_transaction_count++;
     if (m_current_transaction.is_write)
         m_pending_writes.erase(m_current_transaction.paddr);
+    m_statistics.record_accessed_completer(m_current_transaction.target_completer);
     if (!m_current_transaction.paddr_val_has_x) {
-        m_statistics.record_paddr_sample(m_current_transaction.target_completer, m_current_transaction.paddr);
+        m_statistics.record_paddr_for_corruption_analysis(m_current_transaction.target_completer, m_current_transaction.paddr);
     }
     if (m_current_transaction.is_write && !snapshot.pwdata_has_x) {
-        m_statistics.record_pwdata_sample(m_current_transaction.target_completer, snapshot.pwdata);
+        m_statistics.record_pwdata_for_corruption_analysis(m_current_transaction.target_completer, snapshot.pwdata);
     }
-    check_for_out_of_range(snapshot);
+    preliminary_check_for_out_of_range(snapshot);
     uint64_t duration = m_current_pclk_edge_count - m_current_transaction.start_pclk_edge_count + 1;
     if (m_current_transaction.is_write)
         m_statistics.record_write_transaction(m_current_transaction.had_wait_state, duration);
@@ -124,13 +125,11 @@ void ApbAnalyzer::process_transaction_completion(const SignalState& snapshot) {
         m_statistics.record_read_transaction(m_current_transaction.had_wait_state, duration);
     if (!m_current_transaction.is_out_of_range) {
         if (m_current_transaction.is_write && !m_current_transaction.paddr_val_has_x && !snapshot.pwdata_has_x) {
-            m_statistics.update_shadow_memory(m_current_transaction.target_completer, m_current_transaction.paddr, snapshot.pwdata, snapshot.timestamp_ps);
+            m_statistics.update_shadow_memory(m_current_transaction.target_completer, m_current_transaction.paddr, snapshot.pwdata, snapshot.timestamp);
         } else if (!m_current_transaction.is_write && !m_current_transaction.paddr_val_has_x && !snapshot.prdata_has_x) {
-            m_statistics.check_for_data_mirroring(m_current_transaction.target_completer, m_current_transaction.paddr, snapshot.prdata, snapshot.timestamp_ps);
+            m_statistics.check_for_data_mirroring(m_current_transaction.target_completer, m_current_transaction.paddr, snapshot.prdata, snapshot.timestamp);
         }
     }
-    m_current_transaction.pwdata_val = snapshot.pwdata;
-    m_current_transaction.pwdata_val_has_x = snapshot.pwdata_has_x;
     m_completed_transactions.push_back(m_current_transaction);
     m_current_transaction.reset();
     m_current_apb_fsm_state = ApbFsmState::IDLE;
@@ -143,7 +142,7 @@ void ApbAnalyzer::finalize_analysis(uint64_t final_ts) {
     }
     m_statistics.set_first_valid_pclk_edge_for_stats(m_first_valid_pclk_edge_for_stats);
     m_statistics.finalize_bit_activity();
-    detect_all_corruption_errors();
+    filter_and_commit_errors();
 }
 CompleterID ApbAnalyzer::get_completer_id_from_paddr(uint32_t paddr) const {
     if (paddr >= UART_BASE_ADDR && paddr <= UART_END_ADDR)
@@ -154,53 +153,25 @@ CompleterID ApbAnalyzer::get_completer_id_from_paddr(uint32_t paddr) const {
         return CompleterID::SPI_MASTER;
     return CompleterID::UNKNOWN_COMPLETER;
 }
-void ApbAnalyzer::check_for_out_of_range(const SignalState& snapshot) {
-    if (!m_current_transaction.active || m_current_transaction.paddr_val_has_x) {
-        m_current_transaction.is_out_of_range = true;
-        return;
+void ApbAnalyzer::filter_and_commit_errors() {
+    for (const auto& oor_error : m_preliminary_oor_errors) {
+        CompleterID cid = get_completer_id_from_paddr(oor_error.paddr);
+        if (!m_statistics.is_completer_corrupted(cid)) {
+            m_statistics.record_out_of_range_access(oor_error);
+        }
     }
-    if (m_current_transaction.target_completer == CompleterID::UNKNOWN_COMPLETER) {
-        m_current_transaction.is_out_of_range = true;
-        m_statistics.record_out_of_range_access({snapshot.timestamp_ps, m_current_transaction.paddr});
-    } else {
-        m_current_transaction.is_out_of_range = false;
+
+    for (const auto& overlap_error : m_preliminary_overlap_errors) {
+        if (!m_statistics.is_transaction_timeout(overlap_error.write_start_time, overlap_error.write_paddr)) {
+            m_statistics.record_read_write_overlap_error(overlap_error.detail);
+        }
     }
 }
-
-void ApbAnalyzer::detect_all_corruption_errors() {
-    const auto& activity_map = m_statistics.get_completer_bit_activity_map();
-    for (const auto& transaction : m_completed_transactions) {
-        if (transaction.paddr_val_has_x)
-            continue;
-        CompleterID cid = transaction.target_completer;
-        if (cid == CompleterID::NONE || cid == CompleterID::UNKNOWN_COMPLETER)
-            continue;
-
-        auto it = activity_map.find(cid);
-        if (it == activity_map.end())
-            continue;
-        const auto& activity = it->second;
-
-        // 偵測 Address Corruption
-        for (size_t i = 0; i < activity.paddr_bit_details.size(); ++i) {
-            const auto& bi = activity.paddr_bit_details[i];
-            if (bi.status == BitConnectionStatus::SHORTED && bi.shorted_with_bit_index > static_cast<int>(i)) {
-                m_statistics.record_address_corruption({transaction.transaction_start_time_ps, static_cast<int>(i), bi.shorted_with_bit_index});
-                goto next_transaction;
-            }
-        }
-
-        // 偵測 Data Corruption (僅針對寫入交易)
-        if (transaction.is_write && !transaction.pwdata_val_has_x) {
-            for (size_t i = 0; i < activity.pwdata_bit_details.size(); ++i) {
-                const auto& bi = activity.pwdata_bit_details[i];
-                if (bi.status == BitConnectionStatus::SHORTED && bi.shorted_with_bit_index > static_cast<int>(i)) {
-                    m_statistics.record_data_corruption({transaction.transaction_start_time_ps, static_cast<int>(i), bi.shorted_with_bit_index});
-                    goto next_transaction;
-                }
-            }
-        }
-    next_transaction:;
+void ApbAnalyzer::preliminary_check_for_out_of_range(const SignalState& snapshot) {
+    if (!m_current_transaction.active || m_current_transaction.paddr_val_has_x)
+        return;
+    if (m_current_transaction.target_completer == CompleterID::UNKNOWN_COMPLETER) {
+        m_preliminary_oor_errors.push_back({snapshot.timestamp, m_current_transaction.paddr});
     }
 }
 

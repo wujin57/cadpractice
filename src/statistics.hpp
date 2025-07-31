@@ -11,44 +11,10 @@ namespace APBSystem {
 class Statistics {
    public:
     Statistics();
+    bool is_completer_corrupted(CompleterID cid);
+    bool is_transaction_timeout(uint64_t start_time, uint32_t paddr) const;
 
-    inline void record_paddr_sample(CompleterID completer, uint32_t paddr_value) {
-        if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
-            return;
-        m_paddr_samples[completer].push_back(paddr_value);
-    }
-
-    inline void record_pwdata_sample(CompleterID completer, uint32_t pwdata_value) {
-        if (completer == CompleterID::NONE || completer == CompleterID::UNKNOWN_COMPLETER)
-            return;
-        m_pwdata_samples[completer].push_back(pwdata_value);
-    }
-
-    inline CompleterBitActivity& ensure_activity(CompleterID completer_id) {
-        // 處理無效 ID 的邊界情況，確保穩健性
-        if (completer_id == CompleterID::NONE || completer_id == CompleterID::UNKNOWN_COMPLETER) {
-            static CompleterBitActivity empty_activity;
-            if (empty_activity.paddr_bit_details.empty() && m_paddr_width > 0) {
-                empty_activity.resize(m_paddr_width, m_pwdata_width);
-            }
-            return empty_activity;
-        }
-
-        // 核心邏輯：一次性完成查找或建立
-        auto it = m_completer_bit_activity_map.find(completer_id);
-        if (it == m_completer_bit_activity_map.end()) {
-            // 若還沒見過，就一次性完成所有初始化
-            if (m_accessed_completer_ids_set.find(completer_id) == m_accessed_completer_ids_set.end()) {
-                m_accessed_completer_ids_set.insert(completer_id);
-                m_ordered_accessed_completers.push_back(completer_id);
-            }
-
-            CompleterBitActivity tmp;
-            tmp.resize(m_paddr_width, m_pwdata_width);
-            it = m_completer_bit_activity_map.emplace(completer_id, std::move(tmp)).first;
-        }
-        return it->second;
-    }
+    // --- 資料收集 ---
     void record_paddr_for_corruption_analysis(CompleterID completer, uint32_t paddr_value);
     void record_pwdata_for_corruption_analysis(CompleterID completer, uint32_t pwdata_value);
     void record_bus_active_pclk_edge();
@@ -62,8 +28,6 @@ class Statistics {
     void record_out_of_range_access(const OutOfRangeAccessDetail& detail);
     void record_timeout_error(const TransactionTimeoutDetail& detail);
     void record_read_write_overlap_error(const ReadWriteOverlapDetail& detail);
-    void record_address_corruption(const AddressCorruptionDetail& d);
-    void record_data_corruption(const DataCorruptionDetail& d);
     void record_data_mirroring(const DataMirroringDetail& d);
 
     // --- 分析與設定 ---
@@ -84,17 +48,13 @@ class Statistics {
     uint64_t get_num_idle_pclk_edges() const;
     int get_number_of_unique_completers_accessed() const;
     double get_cpu_elapsed_time_ms() const;
-
     const std::vector<OutOfRangeAccessDetail>& get_out_of_range_details() const;
     const std::vector<TransactionTimeoutDetail>& get_timeout_error_details() const;
     const std::vector<ReadWriteOverlapDetail>& get_read_write_overlap_details() const;
-    const std::vector<AddressCorruptionDetail>& get_address_corruption_details() const;
-    const std::vector<DataCorruptionDetail>& get_data_corruption_details() const;
     const std::vector<DataMirroringDetail>& get_data_mirroring_details() const;
-
     uint64_t get_mirroring_error_count() const;
     const std::vector<CompleterID>& get_ordered_accessed_completers() const;
-    const std::map<APBSystem::CompleterID, CompleterBitActivity>& get_completer_bit_activity_map() const;
+    const std::unordered_map<APBSystem::CompleterID, CompleterBitActivity>& get_completer_bit_activity_map() const;
 
    private:
     uint64_t m_read_transactions_no_wait, m_read_transactions_with_wait;
@@ -107,23 +67,20 @@ class Statistics {
     int m_paddr_width{32}, m_pwdata_width{32};
     std::set<CompleterID> m_accessed_completer_ids_set;
     std::vector<CompleterID> m_ordered_accessed_completers;
-    std::map<APBSystem::CompleterID, CompleterBitActivity> m_completer_bit_activity_map;
 
-    std::unordered_map<CompleterID, std::vector<uint32_t>> m_paddr_samples;
-    std::unordered_map<CompleterID, std::vector<uint32_t>> m_pwdata_samples;
+    std::unordered_map<APBSystem::CompleterID, CompleterBitActivity> m_completer_bit_activity_map;
+
     std::vector<OutOfRangeAccessDetail> m_out_of_range_details;
     std::vector<TransactionTimeoutDetail> m_timeout_error_details;
     std::vector<ReadWriteOverlapDetail> m_read_write_overlap_details;
-    std::vector<AddressCorruptionDetail> m_address_corruption_details;
-    std::vector<DataCorruptionDetail> m_data_corruption_details;
     std::vector<DataMirroringDetail> m_data_mirroring_details;
 
     struct ShadowMemoryEntry {
         uint32_t data;
         uint64_t timestamp;
     };
-    std::map<CompleterID, std::map<uint32_t, ShadowMemoryEntry>> m_shadow_memories;
-    std::map<uint32_t, ReverseWriteInfo> m_reverse_write_lookup;
+    std::unordered_map<CompleterID, std::unordered_map<uint32_t, ShadowMemoryEntry>> m_shadow_memories;
+    std::unordered_map<uint32_t, ReverseWriteInfo> m_reverse_write_lookup;
 };
 
 }  // namespace APBSystem

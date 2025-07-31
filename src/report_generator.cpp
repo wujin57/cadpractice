@@ -49,7 +49,7 @@ void ReportGenerator::generate_apb_transaction_report(const Statistics& stats, s
     out << "\nNumber of Transactions with Timeout: " << stats.get_timeout_error_details().size() << "\n";
     out << "Number of Out-of-Range Accesses: " << stats.get_out_of_range_details().size() << "\n";
     out << "Number of Mirrored Transactions: " << stats.get_mirroring_error_count() << "\n";
-    out << "Number of Read-Write Overlap Errors: " << stats.get_read_write_overlap_details().size() << "\n";
+    out << "Number of Read-Write Overlap Errors: " << stats.get_read_write_overlap_details().size();
 
     // Section 3: Completer Connection Status
     const auto& activity_map = stats.get_completer_bit_activity_map();
@@ -63,21 +63,20 @@ void ReportGenerator::generate_apb_transaction_report(const Statistics& stats, s
 
         auto it = activity_map.find(cid);
         if (it != activity_map.end()) {
-            out << "\nCompleter " << completer_num << " PADDR Connections\n";
+            out << "\n\nCompleter " << completer_num << " PADDR Connections";
             const auto& paddr_details = it->second.paddr_bit_details;
             if (!paddr_details.empty()) {
                 for (int j = paddr_details.size() - 1; j >= 0; --j) {
-                    out << "a" << std::setw(2) << std::setfill('0') << j << ": " << bit_detail_status_to_report_string(paddr_details[j], 'a') << "\n";
+                    out << "\na" << std::setw(2) << std::setfill('0') << j << ": " << bit_detail_status_to_report_string(paddr_details[j], 'a');
                 }
             }
 
-            out << "\nCompleter " << completer_num << " PWDATA Connections\n";
+            out << "\n\nCompleter " << completer_num << " PWDATA Connections";
             const auto& pwdata_details = it->second.pwdata_bit_details;
             if (!pwdata_details.empty()) {
-                for (int j = pwdata_details.size() - 1; j >= 1; --j) {
-                    out << "d" << std::setw(2) << std::setfill('0') << j << ": " << bit_detail_status_to_report_string(pwdata_details[j], 'd') << "\n";
+                for (int j = pwdata_details.size() - 1; j >= 0; --j) {
+                    out << "\nd" << std::setw(2) << std::setfill('0') << j << ": " << bit_detail_status_to_report_string(pwdata_details[j], 'd');
                 }
-                out << "d" << std::setw(2) << std::setfill('0') << 0 << ": " << bit_detail_status_to_report_string(pwdata_details[0], 'd');
             }
         }
     }
@@ -91,29 +90,18 @@ void ReportGenerator::generate_apb_transaction_report(const Statistics& stats, s
     std::vector<ErrorLogEntry> errors;
 
     for (const auto& d : stats.get_out_of_range_details()) {
-        errors.push_back({d.timestamp_ps, "Out-of-Range Access -> PADDR 0x" + (std::stringstream() << std::hex << d.paddr).str()});
+        errors.push_back({d.timestamp, "Out-of-Range Access -> PADDR 0x" + (std::stringstream() << std::hex << d.paddr).str()});
     }
     for (const auto& d : stats.get_timeout_error_details()) {
-        errors.push_back({d.start_timestamp_ps, "Timeout Occurred -> Transaction Stalled at PADDR 0x" + (std::stringstream() << std::hex << d.paddr).str()});
+        errors.push_back({d.start_timestamp, "Timeout Occurred -> Transaction Stalled at PADDR 0x" + (std::stringstream() << std::hex << d.paddr).str()});
     }
     for (const auto& d : stats.get_read_write_overlap_details()) {
-        errors.push_back({d.timestamp_ps, "Read-Write Overlap Error -> Read & Write at PADDR 0x" + (std::stringstream() << std::hex << d.paddr).str() + " overlapped"});
+        errors.push_back({d.timestamp, "Read-Write Overlap Error -> Read & Write at PADDR 0x" + (std::stringstream() << std::hex << d.paddr).str() + " overlapped"});
     }
     for (const auto& d : stats.get_data_mirroring_details()) {
         errors.push_back({d.original_write_time, "Address Mirroring -> Write at PADDR 0x" + (std::stringstream() << std::hex << d.original_write_addr).str() + " also reflected at PADDR 0x" + (std::stringstream() << std::hex << d.mirrored_addr).str()});
         errors.push_back({d.read_timestamp, "Data Mirroring -> Value 0x" + (std::stringstream() << std::hex << d.data_value).str() + " written at PADDR 0x" + (std::stringstream() << std::hex << d.original_write_addr).str() + " also found at PADDR 0x" + (std::stringstream() << std::hex << d.mirrored_addr).str()});
     }
-    for (const auto& d : stats.get_address_corruption_details()) {
-        std::ostringstream oss;
-        oss << "Address Corruption -> a" << d.bit_a << "-a" << d.bit_b << " Floating";
-        errors.push_back({d.timestamp, oss.str()});
-    }
-    for (const auto& d : stats.get_data_corruption_details()) {
-        std::ostringstream oss;
-        oss << "Data Corruption -> d" << d.bit_a << "-d" << d.bit_b << " Floating";
-        errors.push_back({d.timestamp, oss.str()});
-    }
-
     std::sort(errors.begin(), errors.end());
     out << "\n";
     for (const auto& e : errors) {

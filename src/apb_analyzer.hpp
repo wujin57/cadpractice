@@ -9,10 +9,13 @@ namespace APBSystem {
 
 class ApbAnalyzer {
    public:
-    explicit ApbAnalyzer(Statistics& statistics, std::ostream& debug_stream);
+    explicit ApbAnalyzer(Statistics& statistics /* std::ostream& debug_stream*/);
 
     void analyze_on_pclk_rising_edge(const SignalState& current_snapshot, uint64_t pclk_edge_count);
-    void finalize_analysis(uint64_t final_vcd_timestamp_ps);
+    void finalize_analysis(uint64_t final_vcd_timestamp);
+    uint64_t get_completed_transaction_count() const {
+        return m_completed_transaction_count;
+    }
 
    private:
     void handle_idle_state(const SignalState& snapshot);
@@ -22,9 +25,8 @@ class ApbAnalyzer {
     void process_transaction_completion(const SignalState& snapshot_at_completion);
 
     bool check_for_timeout(const SignalState& current_snapshot);
-    void check_for_out_of_range(const SignalState& snapshot_at_completion);
-
-    void detect_all_corruption_errors();
+    void preliminary_check_for_out_of_range(const SignalState& snapshot_at_completion);
+    void filter_and_commit_errors();
 
     CompleterID get_completer_id_from_paddr(uint32_t paddr) const;
 
@@ -43,7 +45,16 @@ class ApbAnalyzer {
     std::map<uint32_t, PendingWriteInfo> m_pending_writes;
 
     std::vector<TransactionInfo> m_completed_transactions;
-    std::ostream& m_debug_stream;
+    uint64_t m_completed_transaction_count;
+
+    struct PreliminaryOverlapInfo {
+        ReadWriteOverlapDetail detail;
+        uint64_t write_start_time;
+        uint32_t write_paddr;
+    };
+    std::vector<OutOfRangeAccessDetail> m_preliminary_oor_errors;
+    std::vector<PreliminaryOverlapInfo> m_preliminary_overlap_errors;
+    // std::ostream& m_debug_stream;
 };
 
 }  // namespace APBSystem

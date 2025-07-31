@@ -8,7 +8,7 @@
 
 namespace APBSystem {
 
-// --- 列舉與常數定義 (無變動) ---
+// --- 列舉與常數定義  ---
 enum class ApbFsmState { IDLE,
                          SETUP,
                          ACCESS };
@@ -24,11 +24,12 @@ const uint32_t GPIO_END_ADDR = 0x1A101FFF;
 const uint32_t SPI_MASTER_BASE_ADDR = 0x1A102000;
 const uint32_t SPI_MASTER_END_ADDR = 0x1A102FFF;
 
-// --- 交易與訊號狀態結構 (無變動) ---
+// --- 交易與訊號狀態結構  ---
 struct TransactionInfo {
     bool active = false;
     uint64_t start_pclk_edge_count = 0;
     uint64_t transaction_start_time_ps = 0;
+    uint64_t end_time_ps = 0;
     bool is_write = false;
     uint32_t paddr = 0;
     bool paddr_val_has_x = false;
@@ -52,7 +53,7 @@ struct TransactionInfo {
     }
 };
 struct SignalState {
-    uint64_t timestamp_ps = 0;
+    uint64_t timestamp = 0;
     bool pclk = false;
     bool presetn = true;
     uint32_t paddr = 0;
@@ -69,7 +70,7 @@ struct SignalState {
     bool prdata_has_x = false;
     bool pready = false;
     bool pready_has_x = false;
-    SignalState() { /* 預設值與之前相同 */ }
+    SignalState() {}
 };
 enum class VcdSignalPhysicalType { PCLK,
                                    PRESETN,
@@ -88,11 +89,10 @@ struct VcdSignalInfo {
     int bit_width = 1;
 };
 
-// --- 位元狀態與錯誤結構 (MODIFIED) ---
+// --- 位元狀態與錯誤結構 ---
 enum class BitConnectionStatus { CORRECT,
                                  SHORTED };
 
-// MODIFIED: 移除不再需要的旗標
 struct BitDetailStatus {
     BitConnectionStatus status = BitConnectionStatus::CORRECT;
     int shorted_with_bit_index = -1;
@@ -115,9 +115,8 @@ struct CompleterBitActivity {
     }
 };
 
-// --- 錯誤細節結構 (與前版相同) ---
 struct OutOfRangeAccessDetail {
-    uint64_t timestamp_ps;
+    uint64_t timestamp;
     uint32_t paddr;
 };
 struct DataMirroringDetail {
@@ -132,11 +131,11 @@ struct ReverseWriteInfo {
     uint64_t timestamp;
 };
 struct TransactionTimeoutDetail {
-    uint64_t start_timestamp_ps;
+    uint64_t start_timestamp;
     uint32_t paddr;
 };
 struct ReadWriteOverlapDetail {
-    uint64_t timestamp_ps;
+    uint64_t timestamp;
     uint32_t paddr;
 };
 struct AddressCorruptionDetail {

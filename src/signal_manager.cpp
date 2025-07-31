@@ -27,9 +27,9 @@ VcdSignalPhysicalType SignalManager::deduce_physical_type_from_name(const std::s
     name_suffix.erase(0, name_suffix.find_first_not_of(" \t\n\r\f\v"));
     name_suffix.erase(name_suffix.find_last_not_of(" \t\n\r\f\v") + 1);
 
-    if (name_suffix == "clk" || name_suffix == "pclk")
-        return VcdSignalPhysicalType::PCLK;  // 兼容 pclk
-    if (name_suffix == "rst_n" || name_suffix == "presetn")
+    if (name_suffix == "clk")
+        return VcdSignalPhysicalType::PCLK;
+    if (name_suffix == "rst_n")
         return VcdSignalPhysicalType::PRESETN;
     if (name_suffix == "paddr")
         return VcdSignalPhysicalType::PADDR;
@@ -46,7 +46,6 @@ VcdSignalPhysicalType SignalManager::deduce_physical_type_from_name(const std::s
     if (name_suffix == "pready")
         return VcdSignalPhysicalType::PREADY;
 
-    // std::cerr << "Warning: Unknown signal type for name suffix: " << name_suffix << " (full: " << hierarchical_name << ")" << std::endl;
     return VcdSignalPhysicalType::OTHER;
 }
 
@@ -101,7 +100,7 @@ uint32_t SignalManager::parse_vcd_value_to_uint(const char* value_ptr, size_t va
         if (c == '0' || c == '1') {
             result = (result << 1) | (c == '1');
         } else if (c == 'x' || c == 'X' || c == 'z' || c == 'Z') {
-            result <<= 1;  // 保持位數一致
+            result <<= 1;
             out_has_x_or_z = true;
         } else {
             continue;

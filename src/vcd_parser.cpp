@@ -100,7 +100,7 @@ bool VcdParser::parse_file(const std::string& filename,
                     ++name;
                 const char* type = name;
                 while (type < line_end && *type != ' ' && *type != '\t')
-                    ++type;  // skip "module"
+                    ++type;
                 const char* mod_name = type;
                 while (mod_name < line_end && (*mod_name == ' ' || *mod_name == '\t'))
                     ++mod_name;
