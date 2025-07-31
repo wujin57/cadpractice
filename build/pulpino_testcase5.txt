@@ -7,7 +7,7 @@ Average Write Cycle: 2.00 cycles
 Bus Utilization: 7.22%
 Number of Idle Cycles: 62987
 Number of Completer: 3
-CPU Elapsed Time: 50.14 ms
+CPU Elapsed Time: 47.22 ms
 
 Number of Transactions with Timeout: 0
 Number of Out-of-Range Accesses: 0
